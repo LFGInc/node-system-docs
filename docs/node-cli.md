@@ -1,5 +1,7 @@
 # Node CLI Documentation
 
+Repository: https://github.com/LFGInc/node-cli
+
 `lfgnode` is a command-line interface (CLI) tool for managing workloads and clusters in the LFG network. This document provides an overview of the commands, folder structure, and CI/CD pipeline used in this repository.
 
 ## Commands

@@ -1,5 +1,7 @@
 # Workload Manager
 
+Repository: https://github.com/LFGInc/node-system-workload-management
+
 Node system workload manager is a specific workload runs on user's node, inside the K3S cluster. It is built from [Express JS](https://expressjs.com/) with minimal codebase and dependencies. Workload manager is responsible for:
 
 - Workload version control
