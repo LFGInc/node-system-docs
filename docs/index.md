@@ -2,118 +2,78 @@
 
 ## Overview
 
-The Node System is a DEPIN (Decentralized Physical Infrastructure Network) system designed to facilitate collaboration between Users, Project Owners, and Node Operators. It enables decentralized workload execution, performance tracking, and reward distribution.
+The Node System is a DEPIN (Decentralized Physical Infrastructure Network) enabling decentralized workload execution, performance tracking, and reward distribution.
 
-### Stakeholders
 
-1. **Users**: Individuals who purchase NFTs from Project Owners and operate nodes.
-2. **Project Owners**: Entities that define workloads and distribute rewards based on node performance.
-3. **Node Operators**: Entities responsible for distributing the Node CLI and managing the Node Dashboard.
+## Stakeholders
 
----
+1. **Users**: Operate nodes by purchasing NFTs.
+2. **Project Owners**: Define workloads and distribute rewards.
+3. **Node Operators**: Manage Node CLI and Dashboard.
 
-## Workflow
+## Architecture
+
+There are several components in the Node System architecture:
+
+- [**Node CLI**](NodeCLI/index.md): Command-line interface for managing a node and its workloads.
+- [**Workload Manager**](WorkloadManager/index.md): Version control and uptime management for workloads.
+- [**Node System Backend**](backend/index.md): Backend API for managing nodes/workloads, uptime tracking and notification
+- [**Workload Master**]: Hosted by project owners, responsible for defining workloads and distributing rewards.
+
+![Node System Architecture](assets/NodeSystemArch.svg)
+
+### Node System Workflow
+
+After purchasing NFTs from project owners, users can operate workloads using the Node CLI. Each NFT serves as a license for running a specific workload.
+
+Users utilize the [Node CLI](NodeCLI/index.md) to initialize a K3S cluster on their machines and deploy workloads. Workloads, defined by project owners, run within the K3S cluster. A special hidden workload, called [workload manager](WorkloadManager/index.md) is responsible for the following tasks:
+
+- Receiving health checks from workloads and sending their status to the [backend](backend/index.md) every minute.
+- Periodically verifying workload versions and automatically updating them as needed.
+- Performing self-updates to ensure it remains up-to-date.
+
+Workloads fetch tasks from project owners, execute them, and report the results back to the respective project owners. 
+
+At the end of each day, project owners calculate points based on workload uptime and task execution results. These points are then committed to the [backend](backend/index.md) as the final performance metrics.
+
+This is an overview of the Node System workflow:
 
 ```mermaid
 sequenceDiagram
-    participant User as User
-    participant LFGCLI as LFG-CLI
-    participant Workload as Workload
-    participant ProjectService as Project Service
-    participant LFGService as LFG-Service
+    participant Node
+    participant Workload
+    participant PO as Project Owner
+    participant Backend as Node System Backend
 
-    Note over User, LFGCLI: User triggers the process by running a command in the LFG-CLI.
-    User->>LFGCLI: Run Workload
+    Node->>Workload: Start Workload using CLI
 
-    Note over LFGCLI, Workload: CLI starts the workload on the system.
-    LFGCLI->>Workload: Start Workload
-
-    Note over Workload, ProjectService: Workload receives tasks to process from Project Service.
-    Workload->>ProjectService: Request tasks
-    ProjectService-->>Workload: Send tasks
-
-    Note over Workload, LFGService: Workload reports uptime daily to LFG-Service.
-    loop Every day
-        Workload->>LFGService: Send Uptime
+    loop
+        Workload->>PO: Request tasks
+        PO-->>Workload: Send tasks
+        Workload->Workload: Execute tasks
+        Workload->PO: Report task results
+    end
+    
+    loop Every minute
+        Workload->>Backend: Report health status
     end
 
-    Note over ProjectService: Project Service combines task results from the workload and uptime.
-    ProjectService->>Workload: Retrieve task results
-    Workload-->>ProjectService: Send task results
-    ProjectService->>LFGService: Fetch Uptime Data
-    LFGService-->>ProjectService: Send Uptime Data
-
-    Note over ProjectService: Project Service calculates points based on task results and uptime.
-    ProjectService->>ProjectService: Calculate Points
-
-    Note over ProjectService, LFGService: Project Service sends the final points to LFG-Service for future token distribution.
-    ProjectService->>LFGService: Send Final Points (before 12 AM)
-
-    Note over LFGService: LFG-Service will handle future token distribution based on points.
+    loop Every day
+        PO->>Backend: Fetch Uptime Data
+        Backend-->>PO: Return workload uptime Data
+        PO->>PO: Calculate Points
+        PO->>Backend: Commit final points of Workload
+    end
 ```
-
-1. NFT Purchase and Node Licensing
-      - Users purchase NFTs from Project Owners.
-      - Each NFT grants the user a node license.
-2. Node Installation and Registration
-      - Users install the Node CLI distributed by the Node Operator.
-      - After installation, each node is assigned a unique address.
-      - Users register their node address on the Node Operator's dashboard.
-3. Workload Assignment
-      - Project Owners define workloads for the nodes.
-      - Users can add workloads to their nodes via the Node Dashboard.
-4. Workload Execution and Reporting
-      - Workloads run on the nodes and generate reports:
-          - **Uptime**: Sent to the Node Operator.
-          - **Workload Performance/Job Completion**: Sent to the Project Owner.
-5. Reward Calculation and Distribution
-      - At the end of each day:
-          - Project Owners calculate rewards based on job execution results and uptime.
-          - Project Owners are responsible for distributing rewards to Users.
-
-## System Architecture
-
-### 1. Node Operator
-- **Node CLI**: A command-line interface for node installation and management.
-- **Node Dashboard**: A web-based interface for node registration and monitoring.
-- **Node Workload Manager**: A tool for managing workloads assigned to nodes.
-
-### 2. Project Owner
-- Defines workloads and calculates rewards for Users.
-
----
 
 ## Key Features
 
-- **Decentralized Infrastructure**: Enables distributed workload execution and reporting.
-- **NFT-Based Licensing**: Simplifies node licensing and ownership.
-- **Automated Reward System**: Ensures fair and transparent reward distribution.
-- **Performance Tracking**: Tracks uptime and workload performance for accountability.
-
----
-
-## Getting Started
-
-### For Users
-1. Purchase an NFT from a Project Owner.
-2. Install the Node CLI provided by the Node Operator.
-3. Register your node address on the Node Dashboard.
-4. Add workloads to your node and start earning rewards.
-
-### For Project Owners
-1. Define workloads for nodes.
-2. Monitor workload execution and performance.
-3. Calculate and distribute rewards to Users.
-
-### For Node Operators
-1. Distribute the Node CLI to Users.
-2. Manage the Node Dashboard for node registration and monitoring.
-3. Oversee the Node Workload Manager for workload assignments.
-
----
+- **Decentralized Infrastructure**: Distributed workload execution.
+- **NFT Licensing**: Simplifies node ownership.
+- **Automated Rewards**: Transparent reward distribution.
+- **Performance Tracking**: Tracks uptime and workload results.
 
 ## Additional Resources
 
-- [Node CLI Documentation](NodeCLI/index.md)
-- [Workload Manager Documentation](WorkloadManager/index.md)
-- [API Documentation](API/index.md)
+- [What is a Node](https://support.lfg.inc/hc/en-us/articles/26584598844955-What-is-a-Node)
+- [Node System Articles](https://support.lfg.inc/hc/en-us/sections/26307301761691-General)
