@@ -22,6 +22,8 @@ There are several components in the Node System architecture:
 
 Each component has its own respository, to run them locally, please refer to each component's documentation.
 
+This is a high-level overview of the Node System architecture:
+
 ![Node System Architecture](assets/NodeSystemArch.svg)
 
 ### Node System Workflow
