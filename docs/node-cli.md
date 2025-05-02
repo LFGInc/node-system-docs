@@ -1,6 +1,25 @@
-# Node CLI Documentation
+# lfgnode CLI
 
 [`lfgnode`](https://github.com/LFGInc/node-cli) is a command-line interface (CLI) tool for managing workloads and clusters in the LFG network. This document provides an overview of the commands, folder structure, and CI/CD pipeline used in this repository.
+
+## Prerequisites
+
+- For MacOS & Windows, [Docker Desktop](https://docs.docker.com/desktop/) is required.
+  - After installing Docker Desktop. Open Docker Desktop -> Setting -> General -> Select `Use WSL 2 Based Engine` -> Select `dd the *.docker.internal names to the host's /etc/hosts file` -> Apply & Restart.
+- For Linux, [Docker Engine](https://docs.docker.com/engine/install/) is required.
+- [Go](https://go.dev/doc/install) 1.23 or later is required to build the CLI from source.
+
+## How to run
+
+1. Download packages
+   ```bash
+   go get
+   go mod tidy
+   ```
+2. Build the CLI
+   ```bash
+   go build -o lfgnode main.go
+   ```  
 
 ## Commands
 
@@ -21,6 +40,51 @@ The `lfgnode` CLI supports the following commands:
 - **`workload remove`**: Remove a workload from the cluster.
 - **`workload restart`**: Restart a workload.
 - **`workload status`**: Check the status of a workload.
+
+---
+
+## Folder Structure
+
+The repository is organized as follows:
+
+```
+.
+├── cmd/                # CLI commands
+│   ├── cmd.go          # Root command definition
+│   ├── start.go        # Start command
+│   ├── stop.go         # Stop command
+│   ├── update.go       # Update command
+│   ├── workload/       # Workload-related commands
+│   │   ├── add.go
+│   │   ├── list.go
+│   │   ├── remove.go
+│   │   └── status.go
+│   └── config/         # Configuration-related commands
+│       ├── config.go
+│       └── privateKey.go
+├── internal/           # Internal logic and utilities
+│   ├── api/            # API integrations
+│   ├── cluster/        # Cluster management (e.g., k3d)
+│   ├── hooks/          # Pre-run hooks for commands
+│   └── workload/       # Workload management logic
+├── pkg/                # Shared packages
+│   ├── config/         # Configuration utilities
+│   ├── logger/         # Logging utilities
+│   ├── constants/      # Constants used across the project
+│   └── util/           # Helper functions
+├── scripts/            # Shell scripts for installation and setup
+│   ├── install.sh      # Linux installation script
+│   └── install_macos.sh # MacOS installation script
+├── docs/               # Documentation
+│   └── design.md       # Design document
+├── .github/            # GitHub workflows
+│   └── workflows/
+│       └── release.yml # CI/CD pipeline configuration
+├── main.go             # Entry point for the CLI
+├── go.mod              # Go module definition
+├── go.sum              # Go module dependencies
+└── README.md           # Project overview and installation guide
+```
 
 ## Underlying Technology
 

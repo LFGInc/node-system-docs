@@ -20,6 +20,8 @@ There are several components in the Node System architecture:
 - [**Node System Backend**](backend.md): Backend API for managing nodes/workloads, uptime tracking and notification
 - *Workload Master*: Hosted by project owners, responsible for defining workloads and distributing rewards.
 
+Each component has its own respository, to run them locally, please refer to each component's documentation.
+
 ![Node System Architecture](assets/NodeSystemArch.svg)
 
 ### Node System Workflow
