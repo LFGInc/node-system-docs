@@ -40,6 +40,8 @@ Workloads fetch tasks from project owners, execute them, and report the results 
 
 At the end of each day, project owners calculate points based on workload uptime and task execution results. These points are then committed to the [backend](backend.md) as the final performance metrics.
 
+The backend also summarizes uptime periodically and publishes checkpoint data onchain by uploading summary JSON to Pinata/IPFS and submitting `merkleRoot + cid` to the uptime contract.
+
 This is an overview of the Node System workflow:
 
 ```mermaid
@@ -48,6 +50,8 @@ sequenceDiagram
     participant Workload
     participant PO as Project Owner
     participant Backend as Node System Backend
+    participant IPFS as Pinata/IPFS
+    participant Contract as Onchain Uptime Contract
 
     Node->>Workload: Start Workload using CLI
 
@@ -60,6 +64,13 @@ sequenceDiagram
     
     loop Every minute
         Workload->>Backend: Report health status
+    end
+
+    loop Every hour/day
+        Backend->>Backend: Summarize workload uptime
+        Backend->>IPFS: Upload summary JSON
+        IPFS-->>Backend: Return cid
+        Backend->>Contract: Submit merkleRoot + cid
     end
 
     loop Every day

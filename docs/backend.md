@@ -63,12 +63,14 @@ This repository contains the backend system for the Node System project, built u
 │   ├── modules
 │   │   ├── cron               # Cron job scheduling and management.
 │   │   ├── mail               # Email service module.
+│   │   ├── onchain            # Onchain uptime root submission module.
 │   │   ├── pg                 # Direct access PostgreSQL database module.
 │   │   ├── prisma             # Prisma ORM integration module.
 │   │   ├── redis              # Redis caching and data store module.
 │   │   └── uptime             # Uptime monitoring module.
 │   ├── third-party
-│   │   ├── datagram           # Integration with Datagram services.
+│   │   ├── ipfs               # Pinata/IPFS integration for uptime summaries.
+│   │   ├── slack              # Slack notifications for onchain sync status.
 │   │   └── thegraph           # Integration with The Graph protocol.
 │   └── main.ts                # Entry point for the application.
 ├── <configuration files> ...
@@ -92,15 +94,24 @@ The Node System Backend is simple as below:
 graph TD
     A[NestJS Backend]
     G[Subgraph]
+    I[Pinata/IPFS]
+    C[Onchain Uptime Contract]
+    S[Slack]
     P[(PostgreSQL)]
     R[Redis]
 
     A -->|Query| G
     A -->|Prisma ORM| P
     A -->|Cache Layer| R
+    A -->|Upload uptime summary JSON| I
+    A -->|Submit merkleRoot + cid| C
+    A -->|Notify sync status| S
 
     subgraph External Services
         G
+        I
+        C
+        S
     end
 
     subgraph Data Layer
@@ -112,16 +123,63 @@ graph TD
 It consists of:
 
 - **NestJS Backend**: The main application that handles API requests/responses and cron jobs.
-- **PostgreSQL**: The database used for storing node, worqkload, uptime and reward information.
+- **PostgreSQL**: The database used for storing node, workload, uptime and reward information.
 - **Redis**: The cache layer used for storing node/workload status.
 - **Subgraph**: For fetching NFT data, user balances.
+- **Pinata/IPFS**: Stores uptime summary payloads and returns CIDs.
+- **Onchain Uptime Contract**: Stores submitted daily/hourly merkle roots and CIDs.
+- **Slack**: Receives success/failure notifications for onchain sync.
 
-## Datagram integration
+## Onchain Uptime Module
 
-If project owners do not have their own reward distribution system, they can leverage the [Datagram](https://www.datagram.network/). Datagram is the DePIN baselayer — an AI-driven, Hyper-Fabric Network enabling fast, scalable connectivity and DePIN interoperability.
+The backend includes an onchain uptime workflow that publishes hourly and daily uptime checkpoints.
 
-The entire system architecture integration with Datagram is as below:
+### Flow
 
-![Datagram Integration](assets/DatagramIntegration.png)
+1. Cron jobs summarize workload uptime for the target period.
+2. Valid summary records are built using:
+   - `slug`: workload project code
+   - `nodeId`: node address
+   - `uptime`: summarized uptime value
+3. The summary payload is uploaded to Pinata/IPFS as JSON.
+4. The backend receives a `cid` from Pinata.
+5. A merkle root is computed from summary records.
+6. The backend submits `merkleRoot` + `cid` to the onchain uptime contract:
+   - daily via `submitDailyRoot`
+   - hourly via `submitHourlyRoot`
+7. Slack is notified for success or failure, including type, submit time, root, cid, and tx hash/error.
 
-Each workload now has a Datagram substrate distributed together with its main components. Uptime tracking and reward distribution will be handled by the Datagram network instead of the Node System Backend.
+### Cron Schedules
+
+- Hourly snapshot: `0 0 * * * *` (UTC, top of hour).
+- Daily snapshot: `02 02 * * *` (UTC, 02:02).
+
+### Manual Trigger and Status APIs
+
+- `GET /cron/trigger/summarize-uptime?type=daily|hourly&date=<ISO_DATE>`
+- `GET /cron/uptime-summary?date=<ISO_DATE>`
+
+Both routes require the header:
+
+- `x-cron-secret: <server.cronSecret>`
+
+### Required Config Keys
+
+```yaml
+server:
+  cronSecret: <string>
+
+ipfs:
+  url: https://uploads.pinata.cloud
+  jwt: <pinata_jwt>
+  gateway: https://lfg.mypinata.cloud/ipfs/
+
+ether:
+  rpcUrl: <rpc_url>
+  privateKey: <private_key>
+  contractAddress: <uptime_contract_address>
+
+slack:
+  token: <slack_bot_token>
+  channel: <slack_channel_id>
+```
