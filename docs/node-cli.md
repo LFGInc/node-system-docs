@@ -9,6 +9,38 @@
 - For Linux, [Docker Engine](https://docs.docker.com/engine/install/) is required.
 - [Go](https://go.dev/doc/install) 1.23 or later is required to build the CLI from source.
 
+## Installation and Deployment
+
+### Install Binary (Linux)
+
+Stable channel:
+
+```bash
+curl -sL https://lfgnode-cli.s3.ap-southeast-1.amazonaws.com/releases/install.sh | bash
+```
+
+Beta channel:
+
+```bash
+curl -O https://lfgnode-cli.s3.ap-southeast-1.amazonaws.com/releases/install.sh && bash install.sh -c beta
+```
+
+### Release Deployment Pipeline
+
+`node-cli` deployment is automated by GitHub Actions (`.github/workflows/release.yml`):
+
+1. A git tag triggers the release workflow.
+2. Release channel is determined from the tag:
+   - Tags containing `-rc` publish to the unstable channel metadata (`unstable.txt`).
+   - Other tags publish to the stable channel metadata (`stable.txt`).
+3. GoReleaser builds multi-platform binaries (`linux`, `darwin`, `windows`; `amd64`, `arm64`).
+4. Build metadata is injected at compile time:
+   - `VERSION` (`LFGNODE_VERSION`)
+   - `API_ENDPOINT` (`NODE_SYSTEM_API_ENDPOINT`)
+5. Artifacts are uploaded to S3 under:
+   - `s3://lfgnode-cli/releases/<tag>/...`
+6. The latest channel pointer file (`stable.txt` or `unstable.txt`) is updated in S3.
+
 ## How to run
 
 1. Download packages
@@ -42,6 +74,32 @@ The `lfgnode` CLI supports the following commands:
 - **`workload status`**: Check the status of a workload.
 
 ---
+
+## Version Management
+
+### Check Current CLI Version
+
+```bash
+lfgnode version
+```
+
+### Update CLI to Latest Channel Version
+
+```bash
+lfgnode update
+```
+
+`lfgnode update`:
+
+- Resolves latest version from `https://lfgnode-cli.s3.ap-southeast-1.amazonaws.com/releases/<channel-file>`.
+- Downloads the matching binary archive for the current OS/architecture.
+- Replaces the installed `lfgnode` binary.
+- Stops the running cluster before update and starts it again after update.
+
+### Channel Behavior
+
+- Production builds use `stable.txt`.
+- Development and release-candidate (`-rc`) builds use `unstable.txt`.
 
 ## Folder Structure
 
