@@ -72,7 +72,7 @@ parses them as numbers.
 | `smtp.user`, `smtp.pass`, `smtp.from` | | **yes** | SMTP credentials and `From` header |
 | `redisUrl` | | **yes** | for example `redis://localhost:6379/0` |
 | `databaseUrl` | | **yes** | PostgreSQL URL (runtime). Prisma tooling reads `DATABASE_URL` instead |
-| `ipfs.url` | `https://uploads.pinata.cloud` | no | Pinata upload API base |
+| `ipfs.url` | `https://uploads.pinata.cloud` | no | Pinata upload API base. Only the Pinata **v3 files API** is supported ([IPFS contract](#ipfs-upload-contract)) |
 | `ipfs.jwt` | | **yes** | Pinata JWT |
 | `ipfs.gateway` | `https://ipfs.io/ipfs/` | no | Gateway base used to build CID links (trailing slash) |
 | `ether.rpcUrl` | | **yes** | JSON-RPC URL |
@@ -96,7 +96,7 @@ database. On an empty database it fails with `P1014 The underlying table for mod
 node_workload_points does not exist`. The database can be throwaway.
 
 ```bash
-bun install
+bun install          # no .git (zip download, git archive)? use: LEFTHOOK=0 bun install
 export DATABASE_URL=postgresql://user:pass@host:5432/db
 bun prisma migrate deploy          # squashed baseline + incremental migrations
 bun prisma generate --sql
@@ -111,6 +111,10 @@ pushes to Amazon ECR and needs `vars.AWS_REGION`, `vars.ECR_REPOSITORY`, `secret
 (OIDC role) and `secrets.BUILD_DATABASE_URL` (a migrated, disposable database reachable from runners);
 adapt it to your registry.
 
+`bun install` fails with `prepare script exited 1` when the tree has no `.git` directory (zip download or
+`git archive`), because the `prepare` script installs lefthook git hooks. Use `LEFTHOOK=0 bun install` or
+`bun install --ignore-scripts`.
+
 The production image does **not** contain the Prisma CLI config: run migrations from a source checkout or
 build-stage container before starting a new version.
 
@@ -123,11 +127,25 @@ TZ=Etc/GMT+2 bun run dev
 TZ=Etc/GMT+2 node dist/main.js
 ```
 
+!!! note "Compose ports when the backend runs on the host"
+    The example compose file publishes Postgres on `5432` (clashes with a local Postgres or a graph-node
+    compose) and publishes **no Redis port** (a host-run backend gets `ECONNREFUSED 6379`). Remap Postgres
+    (for example `5433:5432`, then use `:5433` in `databaseUrl` and `DATABASE_URL`) and publish Redis on
+    `127.0.0.1:6379`.
+
 `docker-compose.example.yml` starts Postgres 16, Redis with `--notify-keyspace-events KEA --appendonly yes`
-and the backend with `TZ` set and `config.yaml` mounted. Health check: `GET /api/healthcheck` returns
-`Ping!`. Boot logs: Redis connect and keyspace config, Postgres connect, `Loaded subgraph endpoints`, then
+and the backend with `TZ` set and `config.yaml` mounted. Health check: `GET /api/v1/healthcheck` returns
+`Ping!` (not `/api/healthcheck`). Boot logs: Redis connect and keyspace config, Postgres connect, `Loaded subgraph endpoints`, then
 the server. Boot fails if Redis or Postgres is unreachable or the config is invalid; wrong `ether` or
 `ipfs` values only show up at the first hourly or daily run.
+
+### IPFS upload contract
+
+The backend uploads through `POST {ipfs.url}/v3/files` only: header `Authorization: Bearer <ipfs.jwt>`,
+multipart form with the JSON file and `network=public`; it reads the CID from the response
+`{ "data": { "cid": "..." } }` (`src/third-party/ipfs/ipfs.service.ts`). There is no local Kubo option. For
+local testing a small shim that implements this endpoint on top of Kubo works; point `ipfs.url` at it
+([Local testing](local-testing.md)).
 
 ## Seeding a project
 
@@ -173,7 +191,13 @@ wallet with one license and three workloads gets only its highest-uptime workloa
 requires 24 hourly roots before it accepts a daily root.
 
 **Empty periods.** An hourly run with no uptime submits the sentinel root `0x00...01`; a daily run with no
-uptime submits nothing and marks the day `COMPLETED`.
+uptime submits nothing and marks the day `COMPLETED`. The hourly cron (`0 * * * *`) submits even when there
+is no data, so the sentinel **consumes the slot**: roots are write-once, and a manual trigger for the same
+hour afterwards reverts with `IdAlreadyExists`.
+
+**Daily root needs 24 hourly roots.** A freshly deployed registry cannot accept a daily root until all 24
+hourly slots of that day exist. The admin can fill gaps with `backfillRoot`. A same-day smoke test therefore
+needs backfilled hourly roots plus uptime data of the **prior** day (see [Local testing](local-testing.md)).
 
 **Leaves.** `keccak256(abi.encode(string slug, address nodeId, uint256 uptimeMs))`, tree via
 `SimpleMerkleTree.of(leaves)` (OpenZeppelin). The uploaded JSON is the array `[{slug,nodeId,uptime}]`.
@@ -191,6 +215,13 @@ curl -H "x-cron-secret: $SECRET" http://host:7777/api/v1/cron/trigger/sync-token
 # status of a day (no auth)
 curl "http://host:7777/api/v1/cron/uptime-summary?date=2026-01-01T00:00:00Z"
 ```
+
+Manual triggers have no idempotency: roots are write-once, so triggering an hour that the hourly cron already
+submitted (even with the placeholder root) reverts with `IdAlreadyExists`.
+
+!!! tip "SQL in verification queries"
+    Some columns are camelCase and must be double-quoted in `psql` (`"projectCode"`, `"startTime"`, ...),
+    not written snake_case.
 
 ### Chain submission failures
 
@@ -228,7 +259,7 @@ Base path `/api/v1` (one route at `v1.1`), global prefix `/api`. Swagger (when e
 | Node CLI / workload manager (node-signed) | `PATCH /nodes/:addr`, `PATCH /nodes/:addr/uptime` (heartbeat `{"workloads":[{"projectCode":"..."}]}`, records caller IP), `POST /nodes/:addr/workloads` (checks the owner's NFT balance minus ONLINE workloads, returns manifest CID), `PATCH /nodes/:addr/workloads/:code`, `DELETE /nodes/:addr/workloads/:code` (signed message is the string `<addr>|<code>`), `GET /public/cli-constants` |
 | Operator / dashboard | `POST /nodes` `{nodeAddress, name}` (user-signed; links a node), `PATCH /nodes/:addr/name`, `DELETE /nodes/:addr` (signs `<addr>`, **no ownership check**), `PATCH /user/settings`, `PUT /notifications`; reads with `X-User-Address` only: `GET /nodes`, `GET /user/settings`, `POST /notifications`, `GET /inventory[...]`, `GET /projects` |
 | Project services (admin-signed) | `PATCH /projects/:code` (publish `{version?, workloadIpfsCid?}`), `POST /projects/:code/node-points` (`{date, nodes:[{nodeAddress, point, rewardTokens?}]}`, updates existing `DAILY` rows only) |
-| Public reads | `GET /healthcheck`, `/projects/:code`, `/projects/:code/node-uptimes?date=` (valid daily uptimes: input of the reward calculation; `/api/v1.1/projects/:code/node-uptimes` is paginated), `/projects/:code/node-points?date=`, `/nodes/:addr`, `/nodes/:addr/licenses`, `/nodes/:addr/workloads...`, `/distributions/:code[/stats]`, `/stats/*`, `/cron/uptime-summary` |
+| Public reads | `GET /healthcheck`, `/projects/:code`, `/projects/:code/node-uptimes?date=` (valid daily uptimes: input of the reward calculation; `/api/v1.1/projects/:code/node-uptimes` is paginated), `/projects/:code/node-points?date=`, `/nodes/:addr`, `/nodes/:addr/licenses`, `/nodes/:addr/workloads...` (answers **`404`, code `1012`, "Node address is unknown to this backend"** for a node that was never registered here; registered nodes get `200`, soft-deleted nodes get `200` with `[]`), `/distributions/:code[/stats]`, `/stats/*`, `/cron/uptime-summary` |
 | Operations | `GET /cron/trigger/summarize-uptime`, `/cron/trigger/sync-token/erc721` and `.../erc1155` (`x-cron-secret`) |
 
 Heartbeats arrive about every 60 s; a gap longer than `config.nodeOfflineThreshold` (90 s) opens a new
