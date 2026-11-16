@@ -27,6 +27,9 @@ Every request goes to `NEXT_PUBLIC_BACKEND_URL`; the endpoints used are the publ
 in [Backend](backend.md#http-api). **Your backend must allow the dashboard origin** in
 `server.corsWhitelist`.
 
+The node list loads once on page load (then refreshes every 3 minutes): after switching wallets, reload
+the page.
+
 ## Configuration
 
 Copy `.env.example` to `.env.local`. `NEXT_PUBLIC_*` values are inlined at **build** time: change them,
@@ -40,7 +43,7 @@ id by origin in the provider dashboards.
 | `NEXT_PUBLIC_ALCHEMY_KEY` | empty | Mainnet / sepolia RPC |
 | `NEXT_PUBLIC_APP_ENV` | `development` | `production` lowers the Sentry sample rate and silences debug logs |
 | `NEXT_PUBLIC_TARGET_TIME` | `23:55` | Daily countdown target, `HH:mm` UTC |
-| `NEXT_PUBLIC_LFG_UPTIME_CONTRACT_ADDRESS` | empty | Registry address shown on `/verify-uptime` (name kept for compatibility) |
+| `NEXT_PUBLIC_LFG_UPTIME_CONTRACT_ADDRESS` | empty | Registry address shown on `/verify-uptime` (name kept for compatibility). Must be set at **build** time, or the page shows no address |
 | `NEXT_PUBLIC_APP_NAME` | `Node Dashboard` | Page title, wallet modal, copy |
 | `NEXT_PUBLIC_BRAND_URL` | empty | Logo link (falls back to `/`) |
 | `NEXT_PUBLIC_TERMS_URL`, `_PRIVACY_URL`, `_SUPPORT_URL` | empty | Footer links; hidden when empty |
@@ -59,7 +62,7 @@ Node 22 and pnpm 9.
 pnpm install --frozen-lockfile
 cp .env.example .env.local        # at least backend URL and WalletConnect id
 pnpm dev                          # http://localhost:3000 (starts with --inspect)
-pnpm build && pnpm start          # production build, any Node host
+pnpm build && pnpm start          # production build, any Node host; port 3000 clashes with the backend: pnpm start -p <port>
 pnpm lint                         # note: runs next lint --fix and rewrites files
 ```
 
@@ -84,8 +87,10 @@ pipeline testing; delete these workflows if you do not use Vercel.
   differently (token amounts, unit `$LIX`) in `src/api/inventory/mapper.ts`, and `src/api/project/dto.ts`
   forces network `bsc` for workload types `helix` and `flipit` (all others `eth`). Edit these for your
   project.
-- **`/verify-uptime` slug list** (`flipit`, `meer`, `valley`, ...) is hard-coded in
-  `src/views/verify-uptime/VerifyUptime.tsx` and must match the slugs used when the Merkle root was built.
+- **`/verify-uptime` slug list** (`flipit`, `meer`, `valley`, `connoisseur`, `legacyconnoisseur`, `cerebro`,
+  `helix`) is a hard-coded dropdown in `src/views/verify-uptime/VerifyUptime.tsx`, so a new project code
+  cannot be selected until you edit the list there. It must match the slugs used when the Merkle root was
+  built. Known issue.
 
 Known issues: GET endpoints trust `X-User-Address` (any address's data can be displayed), Sentry session
 replay does not mask text (`maskAllText: false`) so addresses and e-mails may reach Sentry, the Sentry

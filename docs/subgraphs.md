@@ -126,7 +126,8 @@ pnpm prepare:subgraph && pnpm codegen && pnpm build     # CONFIG=configs/example
 pnpm goldsky:login --token "$GOLDSKY_API_KEY" && pnpm goldsky:deploy myproject-node-reward/v0.0.1
 ```
 
-Local graph-node alternative: `cp .env.example .env` (set `POSTGRES_PASSWORD`, `RPC_URL`,
+Local graph-node alternative (the graph-node image is `linux/amd64` only: on Apple Silicon it runs under
+emulation, slow but working; a local graph-node served both subgraphs fine, no Goldsky needed): `cp .env.example .env` (set `POSTGRES_PASSWORD`, `RPC_URL`,
 `GRAPH_NODE_NETWORK` equal to your config's `network`), `docker compose up -d`, then
 `pnpm prepare:subgraph && pnpm codegen && pnpm build && pnpm create-local && pnpm deploy-local`; GraphQL is at
 `http://localhost:8000/subgraphs/name/node-reward`. The Graph Studio works with `graph auth` and

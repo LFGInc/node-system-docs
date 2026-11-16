@@ -101,7 +101,9 @@ Events: `HourlyRootSubmitted`, `DailyRootSubmitted`, `RootBackfilled`. Reward se
 ### Manual submit, proofs and troubleshooting
 
 `scripts/compute-and-upload.js` (Node 18+, `cd scripts && npm install`) builds a tree from a JSON array of
-`{slug,nodeId,uptimeAmount}` and prepares proofs; it does not touch the chain.
+`{slug,nodeId,uptimeAmount}` and prepares proofs; it does not touch the chain. The backend's IPFS JSON uses
+the field name `uptime`; the script accepts both (`uptime ?? uptimeAmount`), so you can feed it a backend
+file directly.
 
 ```bash
 node compute-and-upload.js compute sample-data.json            # prints "Root hash: 0x..."
@@ -152,7 +154,10 @@ cp .env.example .env     # RPC_URL, PRIVATE_KEY (or DEPLOYER_ADDRESS for Ledger)
 ./deploy_node_operators_reward.sh      # step 2; constructor (admin, signer, claimer, token). Note NOR_ADDRESS and the deployment block
 ```
 
-Start emission (HelixToken only, owner transactions):
+Start emission (HelixToken only, owner transactions). **Order matters**: deploy the token (proxy) ->
+deploy NOR -> `startInitialPhase` -> `startGoingPhase` with NOR as a participant (plus percentage and daily
+rate). `startGoingPhase` runs **once**; `updateParticipants` is not needed initially. On BSC pass `--legacy`
+to the deploy scripts (they forward extra arguments: `./deploy_helix_token.sh --legacy`).
 
 ```bash
 # initial phase: mint the initial supply and set max supply (percents are 1e18 = 100%, must sum to 1e18)
@@ -160,6 +165,10 @@ cast send $TOKEN_ADDRESS "startInitialPhase(uint256,uint256,address[],uint256[])
 # going phase: register NOR (and others) as emission participants; percents sum to 1e18, max 50 participants
 cast send $TOKEN_ADDRESS "startGoingPhase(address[],uint256[],uint256)" "[$NOR_ADDRESS,<other>]" "[<p1>,<p2>]" <dailyEmissionRate_1e18> --rpc-url $RPC_URL ...
 ```
+
+**UTC-day rule.** Emission accrues in whole UTC days counted from 00:00 UTC of the day `startGoingPhase` is
+called; the first claimable amount appears at the **next** 00:00 UTC (not 24 h later). A same-day test always
+reads 0: use an anvil fork with a time warp ([Local testing](local-testing.md#token-reward-flow-on-an-anvil-fork)).
 
 `dailyEmissionRate` is a fraction of the remaining emission supply per day (1e18 = 100%). Anyone with
 `CLAIMER_ROLE` then calls `claimHelixToken()` periodically. With a plain ERC20, transfer the budget to
@@ -196,7 +205,8 @@ implements this signer and returns `{ r, s, v }`.
     letter upper-cased (`helix` gives `claimHelixToken()`, `flipit` gives `claimFlipitToken()`). The
     reference contract only has `claimHelixToken()`. For any other project code you must rename
     `claimHelixToken` (and optionally `HelixToken`, `IHelixToken`, `helixToken`) in your fork **before
-    deploying**, find-and-replace across `src/`, `script/`, `test/`.
+    deploying**, find-and-replace across `src/`, `script/`, `test/` (verified: a `sed` rename across those
+    directories keeps all 60 tests passing).
 
 Also hard-coded in `HelixToken.initialize`: name `HELIX` and symbol `LIX`. To adapt, change the strings or
 make them `initialize` arguments (update `script/DeployHelixToken.s.sol` and tests). Do this only for new

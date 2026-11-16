@@ -89,7 +89,11 @@ Validated in `src/configs/index.ts` (`envalid`; the process exits on missing req
 
 The project code reported in the heartbeat is the `name` field of `package.json`; the `dockerfile`
 overwrites it (and `version`) from the `PROJECT_CODE` / `VERSION` build args, so it must equal the project
-code registered in your backend.
+code registered in your backend. **Pass both build args**: with only `PROJECT_CODE` the rewrite is silently
+skipped. Build one image per project code.
+
+The Dockerfile installs pnpm with `npm install -g pnpm`; pnpm 11 fails with `ERR_PNPM_IGNORED_BUILDS` on
+`@nestjs/core`, so pin `pnpm@9`.
 
 ### Master API contract used by the sample job
 
@@ -105,6 +109,9 @@ POST /api/v1/workload/report   body {"node_id": "<NODE_ADDRESS>", "oks": ["<cid>
 Each tick: list CIDs, pin each sequentially (`POST {IPFS_URL}/api/v0/pin/add?arg=<cid>`, 40 s timeout),
 then report. If you need no master, remove `IpfsDistributorModule` from `src/app.module.ts` and drop
 `MASTER_URL` from `configs`; keep `UphealthModule`.
+
+In an isolated cluster (no route to the master's CIDs) the pin step times out after about 40 s per CID; this
+is only a warning.
 
 Known quirks kept as-is: the app listens on port `3000` while the manifest declares
 `containerPort: 5002` (informational only), and `HEALTH_INTERVAL_SECONDS: '1'` in the manifest results in
@@ -159,6 +166,13 @@ Behaviour change versus releases up to `v0.2.5`: `baseurl` no longer defaults to
 `ipfs_api_url` is new and required, `enable_datagram` defaults to `"false"`, the datagram image is an
 input, signature headers are no longer logged, and the unused `time` output was removed. The backend
 removed its datagram integration, so leave `enable_datagram` off.
+
+### Running the deployer locally
+
+The action is plain Node: after building it, run `node dist/index.js` with the inputs as `INPUT_<NAME>`
+environment variables (`INPUT_BASEURL`, `INPUT_IPFS_API_URL`, `INPUT_CODE`, `INPUT_VERSION`, `INPUT_IMAGE`,
+`INPUT_MANIFEST`, `INPUT_PUBLISHER_PRIVATE_KEY`). The master sample's `POST /api/v1/static/text` satisfies
+`ipfs_api_url`. Used by the [local test](local-testing.md).
 
 ### Manifest rules
 
