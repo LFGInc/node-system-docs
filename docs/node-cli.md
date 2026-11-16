@@ -71,7 +71,7 @@ Resolution order, first match wins:
 | `node.private-key` | | none | 64 hex characters. Set with `lfgnode config private-key generate` or `set <key>`. Only changeable while no cluster exists (`lfgnode down` first) |
 
 A complete annotated example is [`config.example.yaml`](https://github.com/LFG-Incorporated/opensource-node-cli/blob/main/config.example.yaml).
-The CLI rewrites the file on each start and keeps unknown keys. Global flag: `-v/--verbose`. Other files
+The CLI rewrites the file on each start and keeps unknown keys. Other files
 in the config directory: `cluster.yaml` (k3d definition, created on first start, editable before the
 cluster exists) and `workloads/*.yaml` (copies of workload secrets).
 
@@ -186,13 +186,37 @@ signature of the raw body made with the node key (no nonce or timestamp).
 | `PATCH /nodes/<addr>` body `{version, os}` | `start` | register or update node info |
 | `GET /nodes/<addr>` | `status` | node uptime (`OnlineToday`, `OnlineYesterday`, ms) |
 | `GET /nodes/<addr>/licenses?mode=cli` | `licenses` | licenses of the owner wallet |
-| `GET /nodes/<addr>/workloads?onlyVersion=true` | `down` | workloads assigned to the node |
+| `GET /nodes/<addr>/workloads?onlyVersion=true` | `down` | workloads assigned to the node (`404` code `1012` if the node is unknown to the backend) |
 | `POST /nodes/<addr>/workloads` | `workload add` | check license, returns `{ipfsCid, rewardAddress, ...}` |
 | `GET /nodes/<addr>/workloads/<project>` | `workload status` | per-workload uptime |
 | `DELETE /nodes/<addr>/workloads/<project>` body `<addr>|<project>` (not signed by the CLI) | `workload remove`, `down` | free the license slot |
 
 The workload manager additionally calls `PATCH /nodes/<addr>/uptime`,
 `GET /nodes/<addr>/workloads?onlyVersion=true` and `PATCH /nodes/<addr>/workloads/<project>`.
+
+## Known issues and local-test tips
+
+| Topic | Detail |
+|---|---|
+| **Do not use `-v/--verbose`** | It crashes with `flag provided but not defined: -v` (stdlib flag parse in `pkg/kubectl`) **after** the cluster is created but **before** the manager and ipfs are deployed, leaving a half-initialised cluster. Recovery: `lfgnode down` (or `k3d cluster delete lfg-node`) and start again without the flag |
+| **One cluster per machine** | The cluster name `lfg-node` is global in Docker. An old, stopped cluster with that name must be removed before a new `lfgnode start` |
+| **Separate test config** | Run with a separate `HOME` (for example `HOME=$PWD/testhome lfgnode ...`) to keep a test config apart from a real one. The config directory is `~/Library/Application Support/lfgnode` on macOS and `~/.config/lfgnode` on Linux |
+| **Private / HTTP image registry** | `cluster.yaml` (editable before the first start) accepts a k3d `registries.config` mirror, see below |
+| **http endpoints** | The CLI accepts `http://` for `api-endpoint`, `release-endpoint` and `ipfs-gateway`; only the workload manager is https-only ([Workload manager](workload-manager.md#local-development)) |
+| **Self-update** | With an `http://` release URL self-update breaks: leave `release-endpoint` (and so the manager's `RELEASE_URL`) empty in tests |
+
+Example mirror for a plain-HTTP registry on the host (port `5001` is a placeholder), in `cluster.yaml`:
+
+```yaml
+registries:
+  config: |
+    mirrors:
+      "host.k3d.internal:5001":
+        endpoint:
+          - http://host.k3d.internal:5001
+```
+
+Then use `host.k3d.internal:5001/...` image names. The full local path is in [Local testing](local-testing.md).
 
 ## When the backend is down
 
@@ -208,7 +232,9 @@ The workload manager additionally calls `PATCH /nodes/<addr>/uptime`,
     - `stop`, `info`, `version`, `config` do not use the backend; `update` only needs the release host.
 - **Inside the cluster** the workload manager keeps running workloads running, logs and retries failed
   reports, and skips a sync whose list fetch failed. The backend records no uptime while it is down.
-  A `200` with an empty list is the dangerous case ([security](security.md#workload-manager)).
+  A `200` with an empty list is the dangerous case ([security](security.md#workload-manager)); the backend
+  now answers `404` (code `1012`) for nodes it has never seen, which the manager treats as an error and
+  keeps the workloads.
 
 ## Repository layout
 

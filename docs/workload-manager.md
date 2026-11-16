@@ -132,7 +132,9 @@ Reports and syncs fail with a warning and are retried on the next tick; running 
 Nothing is credited while the backend is unreachable. A **non-200** response or a network error never
 deletes anything. A **`200` with an empty list deletes all workloads** on every node within one sync
 interval ([security](security.md#workload-manager)): be careful with backend deployments, database
-resets and migrations.
+resets and migrations. The reference backend answers `404` (code `1012`) for a node address it has never
+registered, so a node pointed at a fresh backend keeps its workloads; registered nodes with no workloads
+(and soft-deleted nodes) still get `200` and `[]`.
 
 ## Local development
 
@@ -145,7 +147,13 @@ pnpm lint                # biome
 
 Requires Node.js 22 and pnpm 9. Running outside the cluster is only for debugging. All outbound URLs must
 be `https://` (a custom-DNS `https.Agent` is used for every request, so `http://localhost` backends do not
-work) and names must resolve through public DNS or the host's nameservers.
+work) and names must resolve through the manager's **own resolver (public DNS)**: `/etc/hosts` names and
+`localhost` fail.
+
+For a local test use a TLS proxy in front of the backend plus a public wildcard DNS name such as
+`<ip>.sslip.io`. With a self-signed certificate set `NODE_TLS_REJECT_UNAUTHORIZED=0` on the manager
+Deployment. `lfgnode start` rewrites the Deployment, so patch it **after** start. In production use a real
+domain and certificate. Step by step: [Local testing](local-testing.md).
 
 ## Build
 
