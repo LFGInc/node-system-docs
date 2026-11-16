@@ -16,7 +16,7 @@ manifests together and migrate existing nodes.
 | Deployment and Service `lfg-workload-manager`, port **`6161`** | Workloads push health to `lfg-workload-manager.lfg-user.svc.cluster.local:6161`; the ConfigMap `healthBaseUrl` assumes it; the self-update patches the Deployment by this name |
 | Deployment and Service `ipfs`, port `5001` | ConfigMap `ipfsBaseUrl`; excluded from workload management |
 | ConfigMap `lfg-node-config` with keys `nodeServerBaseUrl`, `nodeAddress`, `healthBaseUrl`, `ipfsBaseUrl` | Read by workload containers (manifests use `configMapKeyRef`) |
-| Secret `lfg-workload-<project-code>` (key `REWARD_ADDRESS`) | Injected into the workload container with `envFrom`; also referenced by the datagram sidecar definition |
+| Secret `lfg-workload-<project-code>` (key `REWARD_ADDRESS`) | Injected into the workload container with `envFrom` |
 | Kubernetes API host port `6445` | Default cluster definition |
 | `NODE_PRIVATE_KEY`, `NODE_SYSTEM_ENDPOINT`, `IPFS_GATEWAY`, `RELEASE_URL`, `SENTRY_DSN`, `KUBE_CONFIG`, `NODE_ENV` | Environment contract between the CLI and the workload manager |
 
@@ -30,7 +30,7 @@ deleted when the backend does not list it).
 |---|---|
 | Project code (`projects.code`, deployer `code`) | Kubernetes Deployment name and `app` label, secret name `lfg-workload-<code>`, workload heartbeat `projectCode`, **part of every Merkle leaf**, and the function name `claim<Code>Token()` in reward contracts. Changing it orphans history |
 | First container name `main-container` and labels `app`, `version` | Set by the deployer on every manifest |
-| Signed publish payload `{projectCode, version, workloadIpfsCid, legacy}` | The deployer signs exactly this string with this key order and the backend verifies the raw body. Keep `legacy` (the backend ignores it) |
+| Signed publish payload `{projectCode, version, workloadIpfsCid}` | The deployer signs exactly this string with this key order and the backend verifies the raw body |
 | `NODE_ADDRESS`, `HEALTH_BASE_URL`, `IPFS_URL` env vars in manifests | Names the template reads |
 
 ## Backend, chain and data formats

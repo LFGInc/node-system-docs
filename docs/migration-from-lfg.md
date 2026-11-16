@@ -69,8 +69,8 @@ node for all projects. If projects separate, tell multi-project operators early 
    subgraph (for your existing license NFT), backend, your forks of CLI and workload manager.
 2. **Load your data** into the new backend ([Backend data](#backend-data)).
 3. **Publish workload releases from your own CI**: new registry, deployer fork with `baseurl` and
-   `ipfs_api_url`, a new version. Leave `enable_datagram` at its default `"false"`: the backend removed the
-   datagram integration (projects that had it enabled, such as Valley, FlipIt and Flora, should drop it). If
+   `ipfs_api_url`, a new version. Use the open-source deployer: it has no sidecar
+   options and signs `{projectCode, version, workloadIpfsCid}`. If
    your manifest's `MASTER_URL` pointed at an LFG host (for example `workload-template-api.lfg.inc`) replace
    it with your master.
 4. **Migrate operators** ([Operator migration](#operator-migration)).

@@ -151,7 +151,7 @@ new version reaches running nodes within the workload manager's 10-minute sync
 ## Deployer (GitHub Action)
 
 Publishes a workload release in three steps: complete the manifest template, upload it to IPFS through an
-upload API you provide, sign `{projectCode, version, workloadIpfsCid, legacy}` with the publisher key and
+upload API you provide, sign `{projectCode, version, workloadIpfsCid}` with the publisher key and
 `PATCH` it to your backend. No dependency on LFG infrastructure.
 
 ### Inputs
@@ -165,13 +165,10 @@ upload API you provide, sign `{projectCode, version, workloadIpfsCid, legacy}` w
 | `image` | yes | | Image repository **without tag**; the action sets `containers[0].image` to `<image>:<version>` |
 | `baseurl` | yes | | Backend base URL; trailing `/` is stripped |
 | `ipfs_api_url` | yes | | Full URL of your IPFS upload endpoint |
-| `enable_datagram` | no | `"false"` | `"true"` injects a `datagram` sidecar; requires `datagram_image` |
-| `datagram_image` | no | `""` | Sidecar image; required when `enable_datagram` is `"true"` |
 
 Behaviour change versus releases up to `v0.2.5`: `baseurl` no longer defaults to an LFG host,
-`ipfs_api_url` is new and required, `enable_datagram` defaults to `"false"`, the datagram image is an
-input, signature headers are no longer logged, and the unused `time` output was removed. The backend
-removed its datagram integration, so leave `enable_datagram` off.
+`ipfs_api_url` is new and required, the signed payload no longer has a `legacy` field, signature headers
+are no longer logged, and the unused `time` output was removed.
 
 ### Running the deployer locally
 
@@ -194,7 +191,6 @@ The template is parsed as YAML and must have `metadata`, `spec` and `spec.templa
 | `spec.template.metadata.labels` | existing + `app: <code>`, `version: <version>` |
 | `spec.template.spec.containers[0].name` | `main-container` |
 | `spec.template.spec.containers[0].image` | `<image>:<version>` |
-| if `enable_datagram`: new first container | `datagram`, `image: <datagram_image>`, `envFrom` secret `lfg-workload-<code>`, env `NODE_ADDRESS` from ConfigMap `lfg-node-config` key `nodeAddress`, env `WORKLOAD_NAME=<code>` |
 
 Everything else passes through. The action does **not** substitute `${VAR}`; the template must already be
 final: the template's workflow does **not** run `envsubst` either, so edit the placeholders (for example
@@ -240,12 +236,10 @@ unauthenticated).
 PATCH {baseurl}/api/v1/projects/{code}
 X-User-Address: <publisher address>
 X-Signature: <EIP-191 signMessage(body)>
-{"projectCode":"<code>","version":"<version>","workloadIpfsCid":"<cid>","legacy":<bool>}
+{"projectCode":"<code>","version":"<version>","workloadIpfsCid":"<cid>"}
 ```
 
-The body is the exact string that was signed (key order as shown); verify over the raw body. `legacy` is
-`!enable_datagram` (so `true` by default) and is part of the signed format: do not alter it. The backend
-ignores the field. The signer must be in `project_admins` of the project or the request is rejected; any
+The body is the exact string that was signed (key order as shown); verify over the raw body. The signer must be in `project_admins` of the project or the request is rejected; any
 non-2xx response fails the step.
 
 ### Usage
