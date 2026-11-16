@@ -272,7 +272,7 @@ pnpm install --frozen-lockfile && pnpm build && pnpm start
 ```
 
 Add the dashboard origin to the backend's `server.corsWhitelist` and restart the backend. Replace the
-bundled LFG logos and fonts. Review the Helix/BSC special cases in `src/configs/projects.ts` and the
+bundled LFG logos. Review the Helix/BSC special cases in `src/configs/projects.ts` and the
 `/verify-uptime` slug list, both hard-coded (a new project code cannot be selected there until you edit the
 list). Set `NEXT_PUBLIC_LFG_UPTIME_CONTRACT_ADDRESS` before building. If port 3000 is taken by the backend,
 use `pnpm start -p <port>`.

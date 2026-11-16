@@ -78,8 +78,8 @@ pipeline testing; delete these workflows if you do not use Vercel.
 2. **Replace the image assets, which are still the original LFG artwork and are not env-driven**:
    `src/assets/images/logos/header-logo.png`, `src/assets/images/logos/lfg-footer.png`, `lfg-logo.svg`,
    `public/favicon.ico` (keep file names or update imports in `src/components/header/*` and `Footer.tsx`).
-3. Colors and fonts: `tailwind.config.ts`, `src/styles/global.css`, `src/assets/fonts`. The bundled Avenir
-   fonts are commercially licensed: replace them with fonts you may distribute.
+3. Colors and fonts: `tailwind.config.ts`, `src/styles/global.css`, `src/assets/fonts`. The UI uses the
+   system font stack; `src/assets/fonts` only ships Orbitron (SIL Open Font License), which no page uses.
 
 ## Hard-coded project behaviour to review
 

@@ -9,7 +9,7 @@ The last sections show how to get hourly and daily roots, points and token claim
 
 | # | Topic | What to do |
 |---|---|---|
-| 1 | Ports | The dashboard default port 3000 clashes with the backend: run the dashboard with `pnpm start -p <port>`. Remap compose Postgres (for example `5433:5432`) and publish Redis on `127.0.0.1:6379` ([Backend](backend.md#build-migrate-run)) |
+| 1 | Ports | The dashboard default port 3000 clashes with the backend: run the dashboard with `pnpm start -p <port>`. The backend's example compose publishes Postgres on `5433` and Redis on `6379` for a host-run backend ([Backend](backend.md#build-migrate-run)) |
 | 2 | IPFS for the backend | Pinata v3 files API only. Run a tiny shim implementing `POST /v3/files` (multipart upload, returns `{ "data": { "cid": "..." } }`) on top of kubo and point `ipfs.url` at it ([contract](backend.md#ipfs-upload-contract)) |
 | 3 | Kubo gateway | Local kubo redirects to a subdomain gateway: set `Gateway.PublicGateways` for `localhost` with `UseSubdomains=false` |
 | 4 | Manager needs https | TLS proxy in front of the backend plus a public wildcard name such as `<ip>.sslip.io`. CLI `api-endpoint` is the **http** URL, the manager Deployment is patched **after** `lfgnode start` ([recipe](#self-signed-tls-for-the-manager)) |
@@ -69,7 +69,7 @@ remove `RELEASE_URL` as in the recipe above.
 1. After 2 to 3 minutes of running, `lfgnode status` shows `OnlineToday` growing.
 2. Trigger jobs by hand with the cron secret
    (`GET /api/v1/cron/trigger/summarize-uptime?type=hourly|daily&date=<ISO>`, header `x-cron-secret`).
-3. The hourly cron (`0 * * * *`) submits even with no data (placeholder root `0x00...01`) and consumes the
+3. The hourly cron (`0 0 * * * *`, top of every hour) submits even with no data (placeholder root `0x00...01`) and consumes the
    slot; a manual trigger in the same hour reverts with `IdAlreadyExists` (roots are write-once).
 4. A daily root needs all 24 hourly roots of that day. On a fresh registry the admin fills gaps with
    `backfillRoot`. For a **same-day** daily root you need backfill plus uptime data of the **prior** day

@@ -128,10 +128,10 @@ TZ=Etc/GMT+2 node dist/main.js
 ```
 
 !!! note "Compose ports when the backend runs on the host"
-    The example compose file publishes Postgres on `5432` (clashes with a local Postgres or a graph-node
-    compose) and publishes **no Redis port** (a host-run backend gets `ECONNREFUSED 6379`). Remap Postgres
-    (for example `5433:5432`, then use `:5433` in `databaseUrl` and `DATABASE_URL`) and publish Redis on
-    `127.0.0.1:6379`.
+    The example compose file publishes Postgres on host port **`127.0.0.1:5433`** (not 5432, which clashes
+    with a local Postgres or a graph-node compose) and Redis on `127.0.0.1:6379`. A backend run **on the host**
+    therefore uses `:5433` in `databaseUrl` and `DATABASE_URL` and `redis://localhost:6379/0`; inside the
+    compose network keep `postgres:5432` and `redis:6379`.
 
 `docker-compose.example.yml` starts Postgres 16, Redis with `--notify-keyspace-events KEA --appendonly yes`
 and the backend with `TZ` set and `config.yaml` mounted. Health check: `GET /api/v1/healthcheck` returns
@@ -191,7 +191,7 @@ wallet with one license and three workloads gets only its highest-uptime workloa
 requires 24 hourly roots before it accepts a daily root.
 
 **Empty periods.** An hourly run with no uptime submits the sentinel root `0x00...01`; a daily run with no
-uptime submits nothing and marks the day `COMPLETED`. The hourly cron (`0 * * * *`) submits even when there
+uptime submits nothing and marks the day `COMPLETED`. The hourly cron (`0 0 * * * *`) submits even when there
 is no data, so the sentinel **consumes the slot**: roots are write-once, and a manual trigger for the same
 hour afterwards reverts with `IdAlreadyExists`.
 
