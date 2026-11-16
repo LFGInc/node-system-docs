@@ -28,7 +28,7 @@ and key is configuration you supply.
 ## Architecture
 
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph chain["EVM chain (BSC in the original deployments)"]
         LIC["License NFT<br/>ERC721 / ERC1155"]
         REG["GlobalNodeUptimeMerkleRegistry"]

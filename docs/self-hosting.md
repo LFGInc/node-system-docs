@@ -13,16 +13,16 @@ order, and how to know it worked.
     registered node without workloads).
 
 ```mermaid
-flowchart LR
-    S0["0 Decide + keys"] --> S1["1 Contracts"]
-    S1 --> S2["2 License subgraph"]
-    S2 --> S3["3 Backend"]
-    S3 --> S4["4 Release CLI + manager"]
-    S4 --> S5["5 Workload + deployer"]
-    S5 --> S6["6 Reward subgraph<br/>(token path)"]
-    S6 --> S7["7 Master or reward service"]
-    S7 --> S8["8 Dashboard"]
-    S8 --> S9["9 Smoke test"]
+flowchart TB
+    subgraph A["Infrastructure"]
+        direction LR
+        S0["0 Decide + keys"] --> S1["1 Contracts"] --> S2["2 License subgraph"] --> S3["3 Backend"] --> S4["4 Release CLI + manager"]
+    end
+    subgraph B["Project services"]
+        direction LR
+        S5["5 Workload + deployer"] --> S6["6 Reward subgraph<br/>(token path)"] --> S7["7 Master or reward service"] --> S8["8 Dashboard"] --> S9["9 Smoke test"]
+    end
+    A --> B
 ```
 
 ## 0. Decide and prepare
