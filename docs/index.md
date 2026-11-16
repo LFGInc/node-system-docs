@@ -133,6 +133,7 @@ All repositories live in the GitHub organization
 | You are... | Run |
 |---|---|
 | Any project | Registry contract, license subgraph, backend (Postgres + Redis), forks of CLI and workload manager with your own release host and image registry, workload repo from the template with the deployer, dashboard (optional but operators need some way to link nodes) |
+| Unsure which applies | Decide in [Self-hosting step 0](self-hosting.md#0-decide-and-prepare) and the local path in [Local testing](local-testing.md) |
 | Points only (Valley-style) | plus the workload master (or your own service) that reads `node-uptimes` and posts `node-points` |
 | Token rewards (Helix- and FlipIt-style) | plus `NodeOperatorsReward` (and a token), reward subgraph and `nodesale-reward` |
 | Own master logic (TikTrix, magnetoHR, Flora-style) | plus your own service against the same two backend endpoints; the workload can be anything that heartbeats |

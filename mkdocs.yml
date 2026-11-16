@@ -9,6 +9,7 @@ nav:
   - Overview:
     - index.md
     - self-hosting.md
+    - local-testing.md
   - Components:
     - node-cli.md
     - workload-manager.md

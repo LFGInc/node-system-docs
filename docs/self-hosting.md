@@ -9,7 +9,8 @@ order, and how to know it worked.
     The code runs exactly as it did in production and has known weaknesses
     ([Security](security.md)). Decide before you expose anything to the internet. In particular, a
     backend that answers `200` with an empty workload list makes every operator's workload manager delete
-    all workloads.
+    all workloads (the reference backend now answers `404` for a node it has never registered, but not for a
+    registered node without workloads).
 
 ```mermaid
 flowchart LR
@@ -26,7 +27,21 @@ flowchart LR
 
 ## 0. Decide and prepare
 
-Settle these values first; they appear in many configs.
+**Decision 1: points only, or token rewards?** It decides which components you deploy
+(overview: [Which parts does your project need?](index.md#which-parts-does-your-project-need)).
+
+| | Points-only project (master-sample) | Token-reward project |
+|---|---|---|
+| Reward logic | `opensource-nodesys-workload-master-sample` (reads `node-uptimes`, posts `node-points`) | `opensource-nodesale-reward` |
+| Needs on chain | uptime registry only | uptime registry **plus** token, `NodeOperatorsReward` (NOR) |
+| Subgraphs | license | license **plus** reward subgraph |
+| Steps to run | 1a, 2, 3, 4, 5, 7 (master), 8, 9 | all, including 1b and 6, and 7 (reward service) |
+| Datastores beyond the backend | MongoDB, Kubo | PostgreSQL for the reward service |
+
+If unsure, start points-only: you can add the token path later. For a local run of either path see
+[Local testing](local-testing.md).
+
+**Decision 2: the values below.** Settle them first; they appear in many configs.
 
 | Decision | Notes |
 |---|---|
@@ -84,8 +99,10 @@ Repository: `opensource-node-operators-reward`. Skip this for points-only projec
 2. Deploy `NodeOperatorsReward` (`./deploy_node_operators_reward.sh`) with admin, signer, claimer and
    token. Note its address (`NOR_ADDRESS`) **and the block number of the deployment** (the reward
    subgraph's `startBlock`).
-3. Helix token only: start emission (`startInitialPhase`, `startGoingPhase`) and register
-   `NOR_ADDRESS` as a participant. For a plain ERC20, transfer the reward budget to `NOR_ADDRESS`.
+3. Helix token only: start emission in this order: `startInitialPhase`, then `startGoingPhase` (once) with
+   `NOR_ADDRESS` as a participant. Emission accrues in whole UTC days; the first claimable amount appears at
+   the next 00:00 UTC. For a plain ERC20, transfer the reward budget to `NOR_ADDRESS`. On BSC add
+   `--legacy` to the deploy scripts.
 4. The reward service calls `claim<Code>Token()` where `<Code>` is your project code with the first
    letter upper-cased (see the [naming constraint](contracts.md#naming-constraint)).
 
@@ -119,7 +136,7 @@ Repository: `opensource-node-system-be`. Details: [Backend](backend.md).
    `docker-compose.example.yml` starts both.
 2. **Migrate before you build.** The Prisma typed-SQL step needs a migrated database:
    ```bash
-   bun install
+   bun install          # no .git (zip download)? use LEFTHOOK=0 bun install
    export DATABASE_URL=postgresql://user:pass@host:5432/db
    bun prisma migrate deploy
    bun prisma generate --sql
@@ -143,7 +160,7 @@ Repository: `opensource-node-system-be`. Details: [Backend](backend.md).
 **Verify**
 
 ```bash
-curl https://BACKEND/api/healthcheck                         # Ping!
+curl https://BACKEND/api/v1/healthcheck                         # Ping!
 curl https://BACKEND/api/v1/public/cli-constants             # {"status":1,"data":{...}}
 ```
 
@@ -225,11 +242,13 @@ Details: [Master and rewards](master-and-rewards.md).
 
 **Points only (or any project needing a master):** run `opensource-nodesys-workload-master-sample`
 (`cp app.example.yaml app.yaml`, set backend URL, the points private key, `projects[]`, MongoDB, Pinata, Kubo).
-Check the `daily_submit_at` timing note on that page.
+Set `daily_submit_at` **after** the backend's 02:02 UTC daily job (for example `02:30:00`; the example
+config's `02:00:30` is too early).
 
 **Token rewards:** run `opensource-nodesale-reward`: Postgres, `.env` and `.env.yaml` (three keys per
 project, admin address), `prisma/migration.sh`, seed one `projects` row and one `projects_systems` row
-(`api_url` is the backend **base host**, `gain_point` 1), start with `TZ=UTC`, one instance only.
+(`api_url` is the backend **base host**, `gain_point` 1), start with `TZ=UTC`, one instance only. No
+Alchemy account is needed if you set `rpc: { <chainId>: "<url>" }` in `.env.yaml`.
 Grant the signer and claimer addresses their roles on `NodeOperatorsReward` (step 1b), and make sure the
 points key (`system`) is in `project_admins` (step 3).
 
@@ -252,7 +271,9 @@ pnpm install --frozen-lockfile && pnpm build && pnpm start
 
 Add the dashboard origin to the backend's `server.corsWhitelist` and restart the backend. Replace the
 bundled LFG logos and fonts. Review the Helix/BSC special cases in `src/configs/projects.ts` and the
-`/verify-uptime` slug list, both hard-coded.
+`/verify-uptime` slug list, both hard-coded (a new project code cannot be selected there until you edit the
+list). Set `NEXT_PUBLIC_LFG_UPTIME_CONTRACT_ADDRESS` before building. If port 3000 is taken by the backend,
+use `pnpm start -p <port>`.
 
 **Verify**: connect a wallet, the project appears in the inventory; adding a node (signature prompt)
 returns success.
@@ -311,5 +332,8 @@ steps, which need a full day (see the end).
    reward service credits and signs a voucher; a test claim on `NodeOperatorsReward` moves the reward
    subgraph's nonce.
 9. **Teardown**: `lfgnode down` (the backend must be reachable, see [Node CLI](node-cli.md#when-the-backend-is-down)).
+
+A local variant that compresses the daily steps into minutes (backfill, manual cron, anvil fork with time
+warp) is in [Local testing](local-testing.md).
 
 If something is missing from these steps, the repository READMEs are authoritative; please fix the docs.
