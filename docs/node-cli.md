@@ -189,7 +189,7 @@ signature of the raw body made with the node key (no nonce or timestamp).
 | `GET /nodes/<addr>/workloads?onlyVersion=true` | `down` | workloads assigned to the node |
 | `POST /nodes/<addr>/workloads` | `workload add` | check license, returns `{ipfsCid, rewardAddress, ...}` |
 | `GET /nodes/<addr>/workloads/<project>` | `workload status` | per-workload uptime |
-| `DELETE /nodes/<addr>/workloads/<project>` body `<addr>\|<project>` (not signed by the CLI) | `workload remove`, `down` | free the license slot |
+| `DELETE /nodes/<addr>/workloads/<project>` body `<addr>|<project>` (not signed by the CLI) | `workload remove`, `down` | free the license slot |
 
 The workload manager additionally calls `PATCH /nodes/<addr>/uptime`,
 `GET /nodes/<addr>/workloads?onlyVersion=true` and `PATCH /nodes/<addr>/workloads/<project>`.
