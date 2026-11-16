@@ -23,6 +23,10 @@ this page.
   the last LFG run.
 - LFG's plan is to answer `410` on every route of the old backend (never `200` with an empty list, which
   would make the old workload managers delete all workloads). A non-200 is safe for the manager.
+- The reference backend now returns `404` (code `1012`, "Node address is unknown to this backend") on
+  `GET /nodes/<addr>/workloads` for a node it never registered, so operator nodes that switch to a new
+  backend keep their workloads as long as the node is unknown there. Registered nodes and soft-deleted nodes
+  still get `200`.
 
 ## What LFG hands over
 
@@ -191,9 +195,11 @@ endpoints:
 4. **Check the node on your backend**: `lfgnode status`, `lfgnode licenses`, `lfgnode workload list`.
 5. **Workloads.** If you imported `nodes`, `wallets` and `node_workloads` into your backend, the existing
    workloads continue and are updated to your next version. If you did **not**, the new backend does not know
-   the node: link it first (dashboard "Add node" with the owner wallet) and then re-add workloads with
-   `lfgnode workload add <project-code>`. Test with one node before moving everyone, because a
-   backend that answers `200` with an empty list for a node makes the manager delete its workloads
+   the node: link it first (dashboard "Add node" or `POST /api/v1/nodes` with the owner wallet) **before**
+   re-adding workloads with `lfgnode workload add <project-code>`. While the node is unknown the backend
+   answers `404` (code `1012`) and the manager keeps the existing workloads; once the node is linked but has
+   no workloads, the answer is `200` with `[]`, and the manager deletes local workloads (hence: link, then
+   add immediately). Test with one node before moving everyone
    ([Security](security.md#workload-manager)).
 6. **Dashboard and claims** move to your project's URLs.
 

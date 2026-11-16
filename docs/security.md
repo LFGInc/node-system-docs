@@ -53,7 +53,10 @@ Repository `opensource-node-cli`:
 Repository `opensource-node-system-workload-management`. It runs in every operator's cluster with
 cluster-admin rights and holds the node key.
 
-1. **`200` with an empty list deletes every workload.** The sync (every 10 minutes) treats the backend's
+1. **`200` with an empty list deletes every workload.** (Fixed for unknown nodes: the reference backend now
+   answers `404`, code `1012`, for a node address it never registered, and the manager keeps workloads on
+   any non-200. Registered nodes and soft-deleted nodes still get `200` and `[]`, so the risk remains for a
+   known node and for a backend that returns `200 []` by mistake.) The sync (every 10 minutes) treats the backend's
    list as the source of truth and deletes all Deployments in the namespace (except `ipfs` and
    `lfg-workload-manager`) not in the list, including when the list is empty. A buggy deploy, a wrong
    `NODE_SYSTEM_ENDPOINT` that answers `{"data": []}`, or a database reset wipes all workloads on all nodes
@@ -167,7 +170,8 @@ record** of operators' unclaimed balances and nonces.
    in places (run `TZ=UTC`); `meta.total` is trusted as the divisor.
 7. Trust in upstreams (backend GETs are unauthenticated; subgraph; RPC). `.env.yaml` holds private keys in
    plain text; request bodies are logged and reward SQL is logged at `info`. The Alchemy SDK is a hard
-   dependency and unlisted chain ids fail at runtime. No health route, no tests.
+   dependency (the RPC URL can be overridden per chain with `rpc:` in `.env.yaml`) and unlisted chain ids
+   fail at runtime. No health route, no tests.
 
 ## Workload tooling
 
@@ -211,7 +215,8 @@ In rough priority order for a self-hoster:
    files, image registry, IPFS upload API and the backend `cli` config. Publish checksums and verify them in
    your own install path; sign releases (cosign) and pin image digests; consider implementing signature
    verification in your fork of the CLI and manager before operators grow in number.
-2. **Never let the backend answer `200` with an empty workload list by mistake.** Before maintenance,
+2. **Never let the backend answer `200` with an empty workload list by mistake** (unknown node addresses
+   already get `404`, code `1012`; a registered node with none left does not). Before maintenance,
    migrations or shutdown return a non-200 (LFG's own shutdown plan returns `410` on every route). Guard the
    manager sync (skip deletions when the list is suddenly empty) in your fork.
 3. **Fix or contain S-04 and S-08 in the backend** before exposing it: add `@ValidateNested`/`@Type` and
