@@ -20,8 +20,10 @@ Two reference services exist. Use one, both, or write your own against those two
     (02:02 UTC, plus IPFS upload and transaction time). The master sample's example config uses
     `daily_submit_at: "02:00:30"`, which is before that on the same clock. Set the master's time **after**
     the daily summary is `COMPLETED` (check `GET /api/v1/cron/uptime-summary?date=<ISO>`); a later time
-    such as `02:30:00` is a safe choice. nodesale-reward runs at 02:10 UTC and checks the summary status
-    itself. If the backend's daily job is slow, 02:10 can be tight.
+    such as `02:30:00` is a safe choice in production, otherwise the day's `DAILY` rows do not exist yet.
+    nodesale-reward runs at 02:10 UTC and checks the summary status itself. If the backend's daily job is
+    slow, 02:10 can be tight. The master has **no manual trigger**: to test, set `daily_submit_at` a minute
+    ahead and restart.
 
 ## Workload master sample
 
@@ -126,14 +128,44 @@ Bun). It ran in production for the Helix and FlipIt programs. For each configure
  operator wallet <-- voucher (signer key) -------+  +-- PostgreSQL (balances, nonces, ledgers)
 ```
 
+### Reward flow and emission setup
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant T as Token (emission)
+    participant C as Claimer (reward service, 01:00)
+    participant N as NodeOperatorsReward
+    participant R as Reward service DB (unclaim)
+    participant O as Operator wallet
+    participant S as Reward subgraph
+    T->>T: emission accrues per UTC day
+    C->>N: claim<Code>Token() mints into NOR
+    Note over R: 02:10 equal split per qualifying node into off-chain unclaim
+    O->>R: ask claim API
+    R-->>O: voucher signed by signer key
+    O->>N: claim(voucher)
+    N-->>S: Claim event
+    S-->>R: service decrements unclaim, increments nonce
+```
+
+- **Unclaimed balances live only in the reward database**: back it up. **Merkle roots are not used by NOR**.
+- **Emission setup order**: deploy token (proxy), deploy NOR, `startInitialPhase`, `startGoingPhase` with NOR as
+  participant. Details and the UTC-day rule (first claimable amount at the **next** 00:00 UTC, so a same-day
+  test reads 0): [Contracts](contracts.md#node-operators-reward).
+- `claim<Code>Token()` needs the reference NOR renamed for any code other than `helix`
+  ([naming constraint](contracts.md#naming-constraint)).
+
 ### Requirements
 
 - **PostgreSQL** (17 recommended), schema **must be `public`** (`?schema=public` in the URL).
 - **Bun >= 1.2** (the Docker image uses `oven/bun:1.2.8-alpine`).
-- **Alchemy** as RPC provider (`alchemy-sdk`). The chain id **must be listed** in `CHAIN_ID_TO_NETWORK`
+- **RPC through `alchemy-sdk`.** The chain id **must be listed** in `CHAIN_ID_TO_NETWORK`
   (`src/packages/alchemy/alchemy.constant.ts`; Ethereum, Optimism, Arbitrum, Polygon, Base, BNB, Avalanche,
-  Linea, zkSync, Scroll, Mantle and testnets). Another chain or provider means editing that file and
-  `alchemy.service.ts`.
+  Linea, zkSync, Scroll, Mantle and testnets). An Alchemy account is **not required**: the optional
+  top-level `rpc: { <chainId>: "<url>" }` in `.env.yaml` overrides the RPC URL per chain (any provider, a
+  local anvil fork). `alchemy.apiKey` must still be a non-empty value (a placeholder is fine then). A chain
+  id missing from `CHAIN_ID_TO_NETWORK` still means editing that file.
 - A backend implementing the [three endpoints below](#backend-endpoints-it-uses), a reward subgraph, and
   **three funded or role-bearing wallets per project**. Optional Slack bot.
 
@@ -148,7 +180,9 @@ sh prisma/migration.sh            # create tables (idempotent)
 TZ=UTC bun dist/main.js           # or: bun run dev
 ```
 
-Docker: `docker build -t nodesale-reward .`, then run with
+Docker: `docker build -t nodesale-reward .` (on arm64 with bun 1.2.8, `bun install --frozen-lockfile` can fail
+under Docker with `failed copying files from cache`: add `--backend=copyfile` to that line of the
+Dockerfile), then run with
 `-e TZ=UTC -e NODESALE_REWARD_URL='postgresql://...?schema=public&connection_limit=5' -v "$PWD/.env.yaml:/app/.env.yaml:ro"`;
 the container applies migrations when `_prisma_migrations` is empty. `docker-compose.example.yaml` adds
 Postgres 17. **Run a single replica.** Projects and keys load at startup: restart after adding a project or
@@ -170,7 +204,8 @@ mode is `env:` in `.env.yaml`), `TZ=UTC` (job date arithmetic uses local-time fu
 | `cookie.*` | no | `@fastify/cookie` settings; the service itself does not use cookies |
 | `swagger.enabled/name/pass` | no | Basic-auth Swagger at `/<prefix>/v<version>/docs`, not served in production |
 | `cron.time` | **yes (section)** | subgraph sync interval in ms per project, minimum and default `15000`; the `cron:` section must exist or the process crashes at startup |
-| `alchemy.apiKey` | yes | Alchemy key |
+| `alchemy.apiKey` | yes | Alchemy key; any non-empty placeholder when `rpc:` overrides the chain |
+| `rpc.<chainId>` | no | RPC URL for that chain, replacing the Alchemy endpoint (for example `rpc: { 97: "http://127.0.0.1:8545" }`). The chain id must still be in `CHAIN_ID_TO_NETWORK` |
 | `alchemy.<chainId>.<sale>.{system,signer,claimer}` | yes | Private keys per project; `<sale>` must equal `projects.sale` (lower-case) exactly |
 | `admin.address` | yes | Lower-case address allowed to call admin endpoints |
 | `slack.token`, `slack.channel` | no | Omit the whole `slack:` section to disable |
@@ -227,6 +262,11 @@ VALUES ('0x<sale-id-lowercase>', 'https://node-system.example.com',  -- BASE HOS
 | 02:10 | `TaskReward.calculateRewards` | For `CLAIMED` ledgers: requires the backend's daily summary of **yesterday** to be `COMPLETED`; pages through qualifying nodes (500 per page); each node gets `amount / total * gain_point`; POSTs to node-points signed with `system`; writes `projects_rewards`, upserts `projects_wallets`, ledger `POINTED` |
 | every `cron.time` ms | `JobService.syncReward` | Reads claim events newer than the cursor from the subgraph: `unclaim -= claimed`, `claimed += claimed`, `nonce = event.nonce + 1` |
 
+One ledger row exists per project per day: to re-run a day you must first delete that day's
+`projects_ledgers` and `projects_rewards` rows. The 00:05 / 01:00 / 02:10 jobs have **no manual trigger**;
+an optional testing aid is a small Nest application-context script that calls `TaskPoint.getPoint`,
+`TaskPoint.claimPoint` and `TaskReward.calculateRewards` directly ([Local testing](local-testing.md)).
+
 If the summary is not `COMPLETED` at 02:10 (or any step fails) the project's day is skipped, Slack is
 notified, and **nothing retries**; re-running a day has no endpoint (fix the database, or add a script
 around `getPoint` / `claimPoint` / `calculateRewards`). Never re-run a day that is already `POINTED`.
@@ -252,7 +292,7 @@ Routes are under `/<prefix>/v<version>` (for example `/api/v1`); `:sale` and `:a
 | Method and path | Auth | Purpose |
 |---|---|---|
 | `GET /projects/:sale/wallets/:addr/operators` | none | `{unclaim, claimed, lastReward?}` (smallest unit); 404 `WALLET_NOT_FOUND` if no row |
-| `POST /projects/:sale/wallets/:addr/operators` | none (by design) | Voucher `{deadline, contract, receiver, nonce, amount, signature:{r,s,v}}`; `deadline` = now + 600 s, `amount` = the wallet's whole `unclaim` |
+| `POST /projects/:sale/wallets/:addr/operators` | none (by design) | Voucher `{deadline, contract, receiver, nonce, amount, signature:{r,s,v}}`; `deadline` = now + 600 s, `amount` = the wallet's whole `unclaim` (the deadline uses the server's wall clock, so on a time-warped test fork the voucher looks expired) |
 | `GET /projects/:sale/wallets/:addr/histories?page=&size=` | none | Paginated claim history |
 | `POST /projects/:sale/pointing` body `{"date":"YYYY-MM-DD"}` | admin | Marks the day's not-yet-pointed rewards as pointed (only for `is_auto_point = false`) |
 
