@@ -208,10 +208,10 @@ Require header `x-cron-secret: <server.cronSecret>`:
 
 ```bash
 # re-run the hourly job for the hour ending at <date>
-curl -H "x-cron-secret: $SECRET" "http://host:7777/api/v1/cron/trigger/summarize-uptime?type=hourly&date=2026-01-01T10:00:00Z"
+curl -H "x-cron-secret: $CRON_SECRET" "http://host:7777/api/v1/cron/trigger/summarize-uptime?type=hourly&date=2026-01-01T10:00:00Z"
 # daily: processes every day from <date> up to yesterday, calling submitDailyRoot for each
-curl -H "x-cron-secret: $SECRET" "http://host:7777/api/v1/cron/trigger/summarize-uptime?type=daily&date=2026-01-01T00:00:00Z"
-curl -H "x-cron-secret: $SECRET" http://host:7777/api/v1/cron/trigger/sync-token/erc1155     # or erc721
+curl -H "x-cron-secret: $CRON_SECRET" "http://host:7777/api/v1/cron/trigger/summarize-uptime?type=daily&date=2026-01-01T00:00:00Z"
+curl -H "x-cron-secret: $CRON_SECRET" http://host:7777/api/v1/cron/trigger/sync-token/erc1155     # or erc721
 # status of a day (no auth)
 curl "http://host:7777/api/v1/cron/uptime-summary?date=2026-01-01T00:00:00Z"
 ```

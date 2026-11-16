@@ -160,8 +160,9 @@ Repository: `opensource-node-system-be`. Details: [Backend](backend.md).
 **Verify**
 
 ```bash
-curl https://BACKEND/api/v1/healthcheck                         # {"status":1,"data":"Ping!"}
-curl https://BACKEND/api/v1/public/cli-constants             # {"status":1,"data":{...}}
+export BACKEND=https://<your-backend-host>                      # used in the rest of this page
+curl $BACKEND/api/v1/healthcheck                                # {"status":1,"data":"Ping!"}
+curl $BACKEND/api/v1/public/cli-constants                       # {"status":1,"data":{...}}
 ```
 
 - Startup logs show Redis and Postgres connected and `Loaded subgraph endpoints`. (Endpoints are read
@@ -191,8 +192,9 @@ tag from `<release-endpoint>/workload-manager/stable.txt`.
 **Verify**
 
 ```bash
-curl https://BUCKET_HOST/workload-manager/stable.txt         # your manager tag, nothing else
-curl https://BUCKET_HOST/releases/stable.txt                 # your CLI tag
+export BUCKET=https://<your-bucket-host>                     # the CLI's release-endpoint
+curl $BUCKET/workload-manager/stable.txt                     # your manager tag, nothing else
+curl $BUCKET/releases/stable.txt                             # your CLI tag
 docker pull public.ecr.aws/<alias>/node-system/workload-manager:<tag>    # anonymous pull works
 ```
 
@@ -285,8 +287,8 @@ steps, which need a full day (see the end).
 
 1. **Operator machine** (Docker running; backend, release host and registry reachable over HTTPS):
    ```bash
-   export LFGNODE_API_ENDPOINT=https://BACKEND
-   export LFGNODE_RELEASE_ENDPOINT=https://BUCKET_HOST
+   export LFGNODE_API_ENDPOINT=$BACKEND
+   export LFGNODE_RELEASE_ENDPOINT=$BUCKET
    export LFGNODE_WORKLOAD_MANAGER_IMAGE=public.ecr.aws/<alias>/node-system/workload-manager
    lfgnode config private-key generate
    lfgnode info                       # note the node address
@@ -296,9 +298,11 @@ steps, which need a full day (see the end).
    `select * from user_wallet_balances where wallet_address = '<owner, lower-case>';`.
 3. **Link the node** (the owner wallet signs the raw body; dashboard "Add node" does the same):
    ```bash
+   NODE=<node address from lfgnode info, lower-case>
+   OWNER=<owner wallet address>; OWNER_KEY=<owner wallet private key, test wallet only>
    BODY='{"nodeAddress":"'$NODE'","name":"smoke"}'
    SIG=$(cast wallet sign --private-key $OWNER_KEY "$BODY")
-   curl -X POST https://BACKEND/api/v1/nodes -H 'content-type: application/json' \
+   curl -X POST $BACKEND/api/v1/nodes -H 'content-type: application/json' \
      -H "X-User-Address: $OWNER" -H "X-Signature: $SIG" --data-raw "$BODY"
    ```
 4. **Start and add the workload**:
@@ -313,8 +317,9 @@ steps, which need a full day (see the end).
    logs of the workload show the heartbeat; workload manager logs show the 60 s report.
 6. **Hourly root on chain.** Trigger the job (or wait for the next full hour):
    ```bash
+   CRON_SECRET=<server.cronSecret from the backend config.yaml>
    curl -H "x-cron-secret: $CRON_SECRET" \
-     "https://BACKEND/api/v1/cron/trigger/summarize-uptime?type=hourly&date=$(date -u +%Y-%m-%dT%H:00:00Z)"
+     "$BACKEND/api/v1/cron/trigger/summarize-uptime?type=hourly&date=$(date -u +%Y-%m-%dT%H:00:00Z)"
    ```
    The backend log does **not** print the transaction hash: get it from the registry's `HourlyRootSubmitted`
    event or the explorer. Check the registry: the id of the slot
