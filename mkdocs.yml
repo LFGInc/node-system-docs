@@ -1,14 +1,28 @@
 site_name: Node System Documentation
-site_url: https://lfginc.github.io/node-system-docs/
-site_author: LFGInc
-site_description: Documentation for LFG Incorporated's Node System
-copyright: Copyright &copy; 2025 LFGInc. Made by LFGInc
+site_url: https://lfg-incorporated.github.io/opensource-node-system-docs/
+site_author: LFG-Incorporated
+site_description: Documentation for the open-source nodesystem (node CLI, workload manager, backend, contracts, subgraphs, reward services)
+repo_url: https://github.com/LFG-Incorporated/opensource-node-system-docs
+repo_name: LFG-Incorporated/opensource-node-system-docs
+copyright: Copyright &copy; 2026 LFG-Incorporated. Released under the MIT license
 nav:
-  - Home:
+  - Overview:
     - index.md
+    - self-hosting.md
+  - Components:
     - node-cli.md
     - workload-manager.md
     - backend.md
+    - contracts.md
+    - subgraphs.md
+    - workloads.md
+    - master-and-rewards.md
+    - dashboard.md
+  - Reference:
+    - fixed-names.md
+    - security.md
+  - Migration:
+    - migration-from-lfg.md
 theme: 
   name: material
   features:
