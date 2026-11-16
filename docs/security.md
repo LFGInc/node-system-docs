@@ -1,7 +1,7 @@
 # Security: known issues and recommendations
 
 The open-source release is intentionally **"runs exactly as it did before"**: only secrets were removed and
-hosted values turned into configuration. Vulnerabilities and weaknesses known from internal review are
+hosted values turned into configuration. Known vulnerabilities and weaknesses are
 **documented, not fixed**. None of the code has had an external audit, and the lists below are not
 exhaustive. Each repository has a `SECURITY.md`; this page consolidates them. Review it, decide which items
 matter for your threat model, and fix or mitigate before exposing anything to the internet or to real
@@ -101,7 +101,7 @@ on-chain by the submitter key.
 Also: single instance only, no automated tests, `smtp.port` ignored. Details and mitigations:
 `SECURITY.md` in the repository.
 
-Operational known issues (found by an independent self-host test, not fixed):
+Operational known issues (not fixed):
 
 - A workload session left open by a backend outage is never closed (`endTime` stays `NULL`) and is excluded
   from summaries.

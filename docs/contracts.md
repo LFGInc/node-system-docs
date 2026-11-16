@@ -241,7 +241,7 @@ implements this signer and returns `{ r, s, v }`.
     letter upper-cased (`helix` gives `claimHelixToken()`, `flipit` gives `claimFlipitToken()`). The
     reference contract only has `claimHelixToken()`. For any other project code you must rename
     `claimHelixToken` (and optionally `HelixToken`, `IHelixToken`, `helixToken`) in your fork **before
-    deploying**, find-and-replace across `src/`, `script/`, `test/` (verified: a `sed` rename across those
+    deploying**, find-and-replace across `src/`, `script/`, `test/` (a `sed` rename across those
     directories keeps all 60 tests passing).
 
 Also hard-coded in `HelixToken.initialize`: name `HELIX` and symbol `LIX`. To adapt, change the strings or

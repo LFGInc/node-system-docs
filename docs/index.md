@@ -18,7 +18,10 @@ and key is configuration you supply.
 
 **Where to go next**
 
+- New to the system: read this page (architecture, [which parts you need](#which-parts-does-your-project-need),
+  [keys](#keys-and-wallets), [terminology](#terminology)), then the [Security](security.md) threat model.
 - Setting up your own copy: [Self-hosting checklist](self-hosting.md).
+- Trying the whole flow on a testnet and local Docker first: [Local testing](local-testing.md).
 - Coming from the LFG-hosted system: [Migration from LFG](migration-from-lfg.md).
 - Names you must not change: [Fixed names](fixed-names.md).
 
@@ -133,14 +136,17 @@ All repositories live in the GitHub organization
 | You are... | Run |
 |---|---|
 | Any project | Registry contract, license subgraph, backend (Postgres + Redis), forks of CLI and workload manager with your own release host and image registry, workload repo from the template with the deployer, dashboard (optional but operators need some way to link nodes) |
-| Unsure which applies | Decide in [Self-hosting step 0](self-hosting.md#0-decide-and-prepare) and the local path in [Local testing](local-testing.md) |
 | Points only (Valley-style) | plus the workload master (or your own service) that reads `node-uptimes` and posts `node-points` |
 | Token rewards (Helix- and FlipIt-style) | plus `NodeOperatorsReward` (and a token), reward subgraph and `nodesale-reward` |
 | Own master logic (TikTrix, magnetoHR, Flora-style) | plus your own service against the same two backend endpoints; the workload can be anything that heartbeats |
 
+Unsure which applies? Decide in [Self-hosting step 0](self-hosting.md#0-decide-and-prepare); to try either path
+locally first, see [Local testing](local-testing.md).
+
 ## Keys and wallets
 
 Many different keys exist and they must not be mixed. Use dedicated keys, keep funds only where listed.
+NOR is short for the `NodeOperatorsReward` contract (see [Terminology](#terminology)).
 
 | Key / wallet | Lives in | What it signs or does | On-chain / backend permission |
 |---|---|---|---|
@@ -172,3 +178,8 @@ registry** can run code on every operator's machine (see [Security](security.md)
 | Manifest | The Deployment YAML published to IPFS; its CID is stored per version in the backend |
 | Master | Optional project service that hands tasks to workloads and/or computes daily points |
 | NOR | `NodeOperatorsReward`, the contract that pays operators against signed vouchers |
+| Registry | `GlobalNodeUptimeMerkleRegistry`, the contract that stores the hourly and daily uptime Merkle roots |
+| Contract day | The 24 hours from 02:00 UTC to 02:00 UTC. The backend and the registry both use this day boundary ([why](backend.md#cron-jobs-and-timezone)) |
+| Points | Per-node, per-day numbers a project writes back to the backend (`node-points`); what they are worth is up to the project |
+| Voucher | A claim signed by the reward service's signer key that an operator submits to NOR to withdraw tokens |
+| Sale id (`sale`) | nodesale-reward's identifier for a project: a lower-case `0x` address used as its database key and in its API paths ([Master and rewards](master-and-rewards.md#seeding-a-project)) |

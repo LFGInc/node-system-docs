@@ -289,8 +289,7 @@ notifications.
 Kept bug-for-bug compatible with production; the full table is in [Security](security.md#backend). Also:
 `smtp.port` is ignored, only the first SMTP host is used, subgraph endpoints load once at boot, PostgreSQL
 TLS is only enabled when the URL contains `amazonaws.com`, geo lookup uses plain-HTTP `ip-api.com` (free
-tier, non-commercial), and the repository has no automated tests. Found by an independent self-host
-test (not fixed):
+tier, non-commercial), and the repository has no automated tests. Further known issues (not fixed):
 
 - A workload session left open by a backend outage is never closed (`endTime` stays `NULL`) and is
   excluded from summaries.

@@ -1,8 +1,9 @@
 # Local test / smoke test
 
-The path below was run end to end (BSC testnet plus local Docker, 2026-11-16). It is a checklist of what
-differs from a production setup; for the production order see [Self-hosting](self-hosting.md). Anything not
-listed here behaves as in the component pages.
+This page lists what differs from a production setup when you run the whole system on a testnet and local
+Docker (it was verified end to end on BSC testnet). Follow the order of [Self-hosting](self-hosting.md) and
+apply the items below on the way; anything not listed here behaves as described in the component pages.
+The last sections show how to get hourly and daily roots, points and token claims in minutes instead of days.
 
 ## Checklist
 
@@ -108,7 +109,7 @@ rows exist. In production use a time such as `02:30:00`, after the backend's 02:
 ## Token-reward flow on an anvil fork
 
 Emission accrues in whole UTC days from 00:00 UTC of the day `startGoingPhase` is called, so a same-day test
-reads 0 and waiting a day is slow. Fork and warp instead (verified: the whole flow runs in minutes).
+reads 0 and waiting a day is slow. Fork and warp instead: the whole flow then runs in minutes.
 
 ```bash
 anvil --fork-url <rpc> --chain-id <id>

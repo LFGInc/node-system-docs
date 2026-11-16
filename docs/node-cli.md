@@ -73,7 +73,7 @@ Resolution order, first match wins:
 **Empty `release-endpoint`.** It is optional. When it is empty, the manager image is used exactly as given in
 `workload-manager-image` (so put an explicit tag there), no `RELEASE_URL` is passed to the manager and
 **self-update is disabled** for both the manager and `lfgnode update`. Earlier CLI builds exited with
-`release endpoint is not configured` in this case; the current branch does not. Use this for local tests and
+`release endpoint is not configured` in this case; the open-source release does not. Use this for local tests and
 for networks that pin their versions.
 
 A complete annotated example is [`config.example.yaml`](https://github.com/LFG-Incorporated/opensource-node-cli/blob/main/config.example.yaml).

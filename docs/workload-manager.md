@@ -128,7 +128,7 @@ reaches running nodes within one sync (10 minutes).
 !!! note "Backend fix required"
     Earlier backend builds answered `GET /nodes/:addr/workloads?onlyVersion=true` with the **latest** version
     in the `version` field, so the manager saw no difference and a new release **never reached running
-    nodes**. The reference backend (branch `opensource-prep`) now returns the node's own running version.
+    nodes**. The open-source reference backend now returns the node's own running version.
     If you run an older backend build, update it.
 
 ### Backend endpoints used
