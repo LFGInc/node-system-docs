@@ -100,7 +100,7 @@ the build machine needs outbound internet access to that host.
 
 Base URL `MASTER_URL` (`src/modules/usecases/ipfs-distributor/ipfs-distributor.service.ts`):
 
-```
+```text
 POST /api/v1/cids/list         body {"node_id": "<NODE_ADDRESS>"}
   -> {"data": {"cids": [{"cid": "<cid>", "created_at": <unix>}]}}
 POST /api/v1/workload/report   body {"node_id": "<NODE_ADDRESS>", "oks": ["<cid>"], "fails": ["<cid>"]}
@@ -208,7 +208,7 @@ final: the template's workflow does **not** run `envsubst` either, so edit the p
 
 ### IPFS upload API contract
 
-```
+```text
 POST {ipfs_api_url}
 Content-Type: application/json
 { "data": "<manifest YAML as a string>" }
@@ -232,7 +232,7 @@ unauthenticated).
 
 ### Publish request
 
-```
+```text
 PATCH {baseurl}/api/v1/projects/{code}
 X-User-Address: <publisher address>
 X-Signature: <EIP-191 signMessage(body)>

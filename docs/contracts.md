@@ -83,7 +83,7 @@ Then put the RPC URL, the registry address and the submitter key into the [backe
 
 Off-chain code must match these exactly (the backend already does).
 
-```
+```text
 leaf = keccak256(abi.encode(string slug, address nodeId, uint256 uptime))        # uptime in ms
 id   = dayNumber * 100 + hourType          # hourType: 0 = daily, 1..24 = hourly
 t    = block.timestamp - 7200              # OFFSET = 2 hours, MINUS
@@ -166,7 +166,7 @@ reward service**. `HelixToken` is the reference UUPS ERC20 (`HELIX` / `LIX`) wit
 emission split among participants; NOR is registered as one participant so emission flows to operators.
 NOR works unchanged with **any ERC20** (payouts use `SafeERC20.safeTransfer`).
 
-```
+```text
 reward service (signer key) --signs claim(receiver, amount, deadline, nonce)--> operator
 operator --claim(receiver, amount, deadline, nonce, v, r, s)--> NodeOperatorsReward --transfer--> operator
 claimer key --claimHelixToken()--> NOR pulls emission from the token (HelixToken only)
@@ -220,7 +220,7 @@ cast call $NOR_ADDRESS "helixToken()(address)" --rpc-url $RPC_URL               
 
 ### Claim signature format
 
-```
+```text
 CLAIM_REWARD_TYPE_HASH = keccak256("ClaimReward(uint256 chainId,address contract,address receiver,uint256 amount,uint256 deadline,uint256 nonce)")
 digest    = keccak256(abi.encode(CLAIM_REWARD_TYPE_HASH, block.chainid, address(NOR), receiver, amount, deadline, nonce))
 signature = ECDSA over `digest` directly      (NO "\x19Ethereum Signed Message" prefix, NO EIP-712 domain)

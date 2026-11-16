@@ -300,7 +300,7 @@ projects share one backend. See [Migration from LFG](migration-from-lfg.md#one-n
 
 ## Repository layout
 
-```
+```text
 main.go                       load config, apply settings, fetch remote constants, run cobra
 cmd/                          commands (start, stop, status, update, down, info, licenses, config, workload ...)
 internal/api/nodesys/         signed HTTP client for the backend

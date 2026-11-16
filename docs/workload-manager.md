@@ -22,7 +22,7 @@ It is responsible for:
 - **Self-update (optional).** Every 30 minutes it reads a version file from the release host and patches
   its own Deployment to that image tag.
 
-```
+```text
 lfgnode (CLI) --creates--> k3d cluster "lfg-node"
                               |-- Deployment lfg-workload-manager   <-- this repo (image built by its CI)
                               |-- Deployment ipfs (kubo)
@@ -227,7 +227,7 @@ ConfigMap `lfg-node-config`, Secret prefix `lfg-workload-`. See [Fixed names](fi
 
 ## Layout
 
-```
+```text
 src/index.ts            Express app (port 6161), starts jobs
 src/configs/env.ts      environment schema (all configuration)
 src/jobs/               workloadUpdater (sync), reportMetrics (uptime), selfUpdater

@@ -134,7 +134,7 @@ Bun). It ran in production for the Helix and FlipIt programs. For each configure
 4. serves a small HTTP API that signs **claim vouchers**, and keeps balances in sync with on-chain claims
    through the [reward subgraph](subgraphs.md#reward-subgraph).
 
-```
+```text
  token contract --(getClaimableAmount)--> 00:05 ledger PENDING
  NodeOperatorsReward <--claim<Code>Token()-- nodesale-reward --GET uptimes / POST node-points--> backend
         ^  (claimer key, 01:00)                  |  ^   02:10: split, credit `unclaim` (POINTED)
