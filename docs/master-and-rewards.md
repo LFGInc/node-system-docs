@@ -32,7 +32,7 @@ One Go process (gin, MongoDB, Kubo, Pinata) doing two jobs:
 1. **Task API for workloads** (`/api/v1/cids/list`, `/api/v1/workload/report`): counterpart of the
    [workload template](workloads.md#workload-template).
 2. **Daily point submitter**: per configured project, reads yesterday's per-node uptime from your backend
-   and posts node points back. Valley and FlipIt used this exact code in production.
+   and posts node points back. This exact code computed daily points for a points-only project in the original deployment.
 
 ```bash
 cp app.example.yaml app.yaml     # edit; app.yaml is git-ignored; the path ./app.yaml is hard-coded
@@ -66,7 +66,7 @@ invalid key.
 | `lfg_node_system.private_key` | string | Hex key (64 chars, **no `0x`**) that signs point submissions; its address must be in `project_admins` of each project |
 | `lfg_node_system.projects[]` | list (min 1) | One submitter job per entry |
 | `...projects[].code` | string | Project code |
-| `...projects[].uptime_threshold` | uint > 1000 | Minimum uptime (ms) to earn points. Valley and FlipIt used `21600000` (6 h) |
+| `...projects[].uptime_threshold` | uint > 1000 | Minimum uptime (ms) to earn points. The original deployment used `60000` (1 min); the example config uses `21600000` (6 h) |
 | `...projects[].daily_submit_at` | `HH:MM:SS` | Time of day to run, in the process's local zone (UTC in the Docker image); see the timing note above |
 | `...projects[].user_gain_point` | uint > 0 | Points awarded to each qualifying node |
 
