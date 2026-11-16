@@ -118,12 +118,25 @@ Details worth knowing:
 - Workloads must ping at least once per `REPORT_INTERVAL` (the template pings about every 10 s): only
   pings from the last window count as alive.
 
+### Rollout of new versions
+
+The manager compares the node's own running `version` with the latest published version
+(`projectWorkloadVersion`) and, when they differ, fetches the new manifest and patches the Deployment,
+then reports the new version with `PATCH /nodes/<addr>/workloads/<code>`. A published version therefore
+reaches running nodes within one sync (10 minutes).
+
+!!! note "Backend fix required"
+    Earlier backend builds answered `GET /nodes/:addr/workloads?onlyVersion=true` with the **latest** version
+    in the `version` field, so the manager saw no difference and a new release **never reached running
+    nodes**. The reference backend (branch `opensource-prep`) now returns the node's own running version.
+    If you run an older backend build, update it.
+
 ### Backend endpoints used
 
 | Method and path | Interval | Notes |
 |---|---|---|
 | `PATCH /api/v1/nodes/<addr>/uptime` body `{nodeAddress, time, workloads:[{projectCode}]}` | at start and every 60 s | signed (`X-Signature`) |
-| `GET /api/v1/nodes/<addr>/workloads?onlyVersion=true` | every 10 min | unsigned; expects `{data:[{projectCode, version, projectWorkloadVersion, workloadCID, ...}]}` |
+| `GET /api/v1/nodes/<addr>/workloads?onlyVersion=true` | every 10 min | unsigned; expects `{data:[{projectCode, version, projectWorkloadVersion, workloadCID, ...}]}`. `version` is the version **this node currently runs**, `projectWorkloadVersion` the latest published one; a difference makes the manager patch the Deployment ([note](#rollout-of-new-versions)) |
 | `PATCH /api/v1/nodes/<addr>/workloads/<code>` body `{version, nodeAddress, time}` | after a workload upgrade | signed |
 
 ### When the backend is down
@@ -152,8 +165,18 @@ work) and names must resolve through the manager's **own resolver (public DNS)**
 
 For a local test use a TLS proxy in front of the backend plus a public wildcard DNS name such as
 `<ip>.sslip.io`. With a self-signed certificate set `NODE_TLS_REJECT_UNAUTHORIZED=0` on the manager
-Deployment. `lfgnode start` rewrites the Deployment, so patch it **after** start. In production use a real
-domain and certificate. Step by step: [Local testing](local-testing.md).
+Deployment. `lfgnode start` rewrites the Deployment, so patch it **after** start (full recipe: [Local
+testing](local-testing.md#self-signed-tls-for-the-manager)):
+
+```bash
+kubectl -n lfg-user set env deploy/lfg-workload-manager \
+  NODE_SYSTEM_ENDPOINT=https://<ip>.sslip.io:<tlsPort> \
+  NODE_TLS_REJECT_UNAUTHORIZED=0 \
+  RELEASE_URL-
+```
+
+(`RELEASE_URL-` removes the variable, which disables self-update.) In production use a real domain and
+certificate.
 
 ## Build
 
@@ -189,6 +212,13 @@ workflow; the CLI only needs a pullable image name and the `stable.txt` file.
 
 Both repositories must be released for the new manager to take effect: the manager reads its endpoints
 from the variables the new CLI sets.
+
+Without a release host (local tests, or any setup that pins the image): leave the CLI's `release-endpoint`
+empty and set `workload-manager-image` to an **explicit tag**, for example
+`ghcr.io/<org>/workload-manager:v1.0.0`. The CLI then deploys exactly that image and the manager gets no
+`RELEASE_URL`, so **self-update is disabled** ([Node CLI](node-cli.md#configuration)). If you do use a release
+endpoint over plain `http://` for a local test, the dev builds read `workload-manager/unstable.txt` (not
+`stable.txt`), and the manager still cannot self-update over http.
 
 ## Names that must not change
 

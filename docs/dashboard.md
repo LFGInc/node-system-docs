@@ -38,8 +38,8 @@ id by origin in the provider dashboards.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `NEXT_PUBLIC_BACKEND_URL` | none | **Required**; the app throws at startup without it |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | empty | **Effectively required**: RainbowKit throws during build without one |
+| `NEXT_PUBLIC_BACKEND_URL` | none | **Required**; the app throws at startup without it. The reference backend listens on `7777` by default, so the local value is `http://localhost:7777` |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | empty | **Effectively required**: RainbowKit throws during build without one. Any non-empty placeholder is enough at build time; only real WalletConnect sessions need a valid id |
 | `NEXT_PUBLIC_ALCHEMY_KEY` | empty | Mainnet / sepolia RPC |
 | `NEXT_PUBLIC_APP_ENV` | `development` | `production` lowers the Sentry sample rate and silences debug logs |
 | `NEXT_PUBLIC_TARGET_TIME` | `23:55` | Daily countdown target, `HH:mm` UTC |
@@ -91,6 +91,13 @@ pipeline testing; delete these workflows if you do not use Vercel.
   `helix`) is a hard-coded dropdown in `src/views/verify-uptime/VerifyUptime.tsx`, so a new project code
   cannot be selected until you edit the list there. It must match the slugs used when the Merkle root was
   built. Known issue.
+- **`/verify-uptime` text hard-codes BSCScan and `ipfs.io`.** The page's instructions point at BSCScan as
+  the explorer and `https://ipfs.io/ipfs/<CID>` for the tree file, whatever chain and gateway you use.
+  Known issue (edit `VerifyUptime.tsx`). `ipfs.io` may be blocked or odd on some networks;
+  `https://gateway.pinata.cloud/ipfs/<CID>` works.
+- **`date` is required** on the distributions and rewards endpoints the dashboard calls
+  (`/distributions/:code`, `/distributions/:code/stats`, `/inventory/:code/rewards`); calling them without a
+  `date` query parameter fails.
 
 Known issues: GET endpoints trust `X-User-Address` (any address's data can be displayed), Sentry session
 replay does not mask text (`maskAllText: false`) so addresses and e-mails may reach Sentry, the Sentry

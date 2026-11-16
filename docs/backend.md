@@ -36,11 +36,11 @@ graph TD
 
 | Component | Requirement |
 |---|---|
-| Runtime | Bun 1.3 (package manager and build) and Node.js 20 or newer (runtime image uses Node 24) |
+| Runtime | Bun 1.3 (package manager and build; 1.2.23 was also tested and works) and Node.js 20 or newer (runtime image uses Node 24) |
 | PostgreSQL | **16**; needed at runtime **and** at build time (see Build) |
 | Redis | Database **0** only, keyspace notifications `KEA`. The app runs `CONFIG SET` itself at boot: allow `CONFIG` for its user or preconfigure the server. Managed Redis that blocks `CONFIG` crashes the app at start |
 | IPFS pinning | A [Pinata](https://pinata.cloud) account and JWT able to upload files (Pinata v3 `POST /v3/files`, `network=public`). Another provider needs code changes |
-| Chain | JSON-RPC endpoint and **your own** `GlobalNodeUptimeMerkleRegistry`. The `ether.privateKey` wallet needs `SUBMITTER_ROLE` and gas. One registry per project |
+| Chain | JSON-RPC endpoint and **your own** `GlobalNodeUptimeMerkleRegistry`. The `ether.privateKey` wallet needs `SUBMITTER_ROLE` and gas. One registry per backend (one backend may serve several projects) |
 | Subgraph | GraphQL endpoint with entities `NodeTotalBalance` (ERC1155) and/or `ERC721NodeTotalBalance` (ERC721); the [license subgraph](subgraphs.md#license-subgraph) provides them |
 | SMTP, Slack | Optional in practice (offline e-mails, submission notices) but the config keys are required |
 | Egress | Pinata, RPC, subgraph, SMTP, Slack, `http://ip-api.com` (geo lookup, plain HTTP, free tier is non-commercial) |
@@ -74,7 +74,7 @@ parses them as numbers.
 | `databaseUrl` | | **yes** | PostgreSQL URL (runtime). Prisma tooling reads `DATABASE_URL` instead |
 | `ipfs.url` | `https://uploads.pinata.cloud` | no | Pinata upload API base. Only the Pinata **v3 files API** is supported ([IPFS contract](#ipfs-upload-contract)) |
 | `ipfs.jwt` | | **yes** | Pinata JWT |
-| `ipfs.gateway` | `https://ipfs.io/ipfs/` | no | Gateway base used to build CID links (trailing slash) |
+| `ipfs.gateway` | `https://ipfs.io/ipfs/` | no | Gateway base used to build CID links (trailing slash). `ipfs.io` may be blocked or odd on some networks; `https://gateway.pinata.cloud/ipfs/` works |
 | `ether.rpcUrl` | | **yes** | JSON-RPC URL |
 | `ether.privateKey` | | **yes** | Submitter key (`0x` + 64 hex): `SUBMITTER_ROLE` and gas |
 | `ether.contractAddress` | | **yes** | Your registry address |
@@ -135,7 +135,7 @@ TZ=Etc/GMT+2 node dist/main.js
 
 `docker-compose.example.yml` starts Postgres 16, Redis with `--notify-keyspace-events KEA --appendonly yes`
 and the backend with `TZ` set and `config.yaml` mounted. Health check: `GET /api/v1/healthcheck` returns
-`Ping!` (not `/api/healthcheck`). Boot logs: Redis connect and keyspace config, Postgres connect, `Loaded subgraph endpoints`, then
+`{"status":1,"data":"Ping!"}` (not `/api/healthcheck`). Boot logs: Redis connect and keyspace config, Postgres connect, `Loaded subgraph endpoints`, then
 the server. Boot fails if Redis or Postgres is unreachable or the config is invalid; wrong `ether` or
 `ipfs` values only show up at the first hourly or daily run.
 
@@ -289,6 +289,14 @@ notifications.
 Kept bug-for-bug compatible with production; the full table is in [Security](security.md#backend). Also:
 `smtp.port` is ignored, only the first SMTP host is used, subgraph endpoints load once at boot, PostgreSQL
 TLS is only enabled when the URL contains `amazonaws.com`, geo lookup uses plain-HTTP `ip-api.com` (free
-tier, non-commercial), and the repository has no automated tests.
+tier, non-commercial), and the repository has no automated tests. Found by an independent self-host
+test (not fixed):
+
+- A workload session left open by a backend outage is never closed (`endTime` stays `NULL`) and is
+  excluded from summaries.
+- `POST /nodes` validation errors come back as a bare `Bad Request Exception` with no field detail.
+- Registry reverts (`IdAlreadyExists`, `MissingHourlyRoots`, ...) are not decoded in the log.
+- The log does **not** print the root submission's transaction hash (nor is it stored): read it from the
+  registry's `HourlyRootSubmitted` / `DailyRootSubmitted` events or the explorer.
 
 Migrating data from an LFG export: [Migration from LFG](migration-from-lfg.md#backend-data).

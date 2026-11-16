@@ -48,7 +48,7 @@ If unsure, start points-only: you can add the token path later. For a local run 
 | **Chain** | Any EVM chain for the contracts. The original deployments used BSC; use a testnet (BSC testnet is chain id 97) for the first run |
 | **Project code** | Lower-case slug, for example `myproject`. Permanent: it is part of every Merkle leaf, the Kubernetes workload name and the secret name |
 | **License NFT** | The ERC721 / ERC1155 contract whose balances limit workloads. Existing project NFT, or a test token for the first run. Note its address and deployment block |
-| **One backend, one registry** | The backend config has a single `ether.contractAddress`, so one backend deployment commits to one registry. A registry stores one root per hour and per day for the whole contract |
+| **One backend, one registry** | The backend config has a single `ether.contractAddress`, so one backend deployment commits to one registry. A registry stores one root per hour and per day for the whole contract, so give each backend its own. One backend can serve several projects (leaves carry the project slug) |
 | **Backend URL** | `https://`, public DNS. The workload manager only talks `https://` and resolves names through public / host DNS (no `/etc/hosts`, no `http://localhost`) |
 | **Release host** | An HTTPS bucket (S3 or equivalent) that serves CLI archives and the manager's version file. Becomes the CLI's `release-endpoint` |
 | **Image registry** | Anonymously pullable (no pull secret is created). The workload manager and your workload image both go there |
@@ -160,7 +160,7 @@ Repository: `opensource-node-system-be`. Details: [Backend](backend.md).
 **Verify**
 
 ```bash
-curl https://BACKEND/api/v1/healthcheck                         # Ping!
+curl https://BACKEND/api/v1/healthcheck                         # {"status":1,"data":"Ping!"}
 curl https://BACKEND/api/v1/public/cli-constants             # {"status":1,"data":{...}}
 ```
 
@@ -316,7 +316,8 @@ steps, which need a full day (see the end).
    curl -H "x-cron-secret: $CRON_SECRET" \
      "https://BACKEND/api/v1/cron/trigger/summarize-uptime?type=hourly&date=$(date -u +%Y-%m-%dT%H:00:00Z)"
    ```
-   The Slack message (or backend log) shows root, CID and tx hash. Check the registry: the id of the slot
+   The backend log does **not** print the transaction hash: get it from the registry's `HourlyRootSubmitted`
+   event or the explorer. Check the registry: the id of the slot
    is derived from `block.timestamp - 2h` (see [Contracts](contracts.md#leaf-ids-and-time-rules)):
    ```bash
    t=$(( $(date -u +%s) - 7200 )); day=$((t/86400)); h=$(( (t/3600) % 24 ))

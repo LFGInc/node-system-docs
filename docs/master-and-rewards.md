@@ -36,11 +36,14 @@ One Go process (gin, MongoDB, Kubo, Pinata) doing two jobs:
 
 ```bash
 cp app.example.yaml app.yaml     # edit; app.yaml is git-ignored; the path ./app.yaml is hard-coded
-docker compose up -d             # optional: local Kubo (API on host :5002)
+docker compose up -d             # starts ONLY a local Kubo (API on host :5002); MongoDB is not included
 make build && make run           # or: go run ./cmd/main.go   (Go 1.22+)
 # Docker
 docker build -t workload-master . && docker run -d -p 3001:3001 -v "$PWD/app.yaml:/app/app.yaml:ro" workload-master
 ```
+
+**MongoDB is not part of the sample's `compose.yaml`**: provide it yourself (`mongo.uri`), for example
+`docker run -d --name master-mongo -p 27017:27017 mongo:7` and `mongo.uri: mongodb://localhost:27017`.
 
 (The Dockerfile `EXPOSE`s 8080 but the server listens on `port` from the config; publish the port you
 configured.)
@@ -58,7 +61,7 @@ invalid key.
 | `mongo.db` | string | Database name. Collections `cids` and `workloadCheckPoints` (unique indexes) are created on startup |
 | `mongo.list_cid_limit` | int > 0 | Max CIDs returned per `/cids/list` call |
 | `pinata.url` | URL | Pinata API base, `https://api.pinata.cloud` |
-| `pinata.token` | string | Pinata JWT (`POST {url}/pinning/pinFileToIPFS`) |
+| `pinata.token` | string | Pinata JWT with the **legacy pinning scope** (`POST {url}/pinning/pinFileToIPFS`); see below |
 | `lfg_node_system.url` | URL | Your backend base URL; the master calls `{url}/api/v1/projects/...` |
 | `lfg_node_system.private_key` | string | Hex key (64 chars, **no `0x`**) that signs point submissions; its address must be in `project_admins` of each project |
 | `lfg_node_system.projects[]` | list (min 1) | One submitter job per entry |
@@ -68,6 +71,17 @@ invalid key.
 | `...projects[].user_gain_point` | uint > 0 | Points awarded to each qualifying node |
 
 (The key prefix `lfg_node_system` is a historical name; it is your backend.)
+
+!!! warning "Pinata legacy pinning API"
+    The sample uploads through Pinata's **legacy** API (`pinFileToIPFS`). A key without the legacy pinning
+    scope (for example one created only for the newer v3 files API) makes every upload fail, and the real
+    error is hidden behind a decoding message such as
+    `json: cannot unmarshal object into Go struct field ....error of type string`. Create a key that has the
+    legacy pinning permission. Without one, `POST /static/text` (and so the deployer's `ipfs_api_url` pointing at
+    this master) does not work; use a small shim instead: an endpoint that accepts `POST {"data":"<text>"}`
+    (or the Pinata v3 `POST /v3/files` contract from the [backend page](backend.md#ipfs-upload-contract))
+    and answers `{"data":"<cid>"}` after adding the text to your own Kubo node. The master's point
+    submitter does not need Pinata.
 
 ### HTTP API
 

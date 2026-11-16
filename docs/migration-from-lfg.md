@@ -44,10 +44,24 @@ this page.
 | **Links** | Open-source repositories and these docs | |
 
 What LFG does **not** hand over: running infrastructure (backend, databases, dashboards, subgraphs on LFG's
-Goldsky, Pinata account), and `SUBMITTER_ROLE` on its registry (every project must deploy its own,
-otherwise projects compete for the single root per hour and day). Whether personal operator data in the
+Goldsky, Pinata account), and `SUBMITTER_ROLE` on its registry (every backend you run must deploy its own,
+otherwise two backends compete for the single root per hour and day). Whether personal operator data in the
 export (alert e-mail addresses in `wallets.settings`, node IP and geo data) is included depends on what LFG
 states in your handover: if you receive it and do not need it, clear it.
+
+## One node per backend
+
+A node is bound to one backend, and `lfgnode` allows **one node per machine**: the cluster name `lfg-node`,
+the Kubernetes API port `6445` and the config directory are fixed ([Fixed names](fixed-names.md)). The
+consequence for operators who earned in several LFG projects:
+
+| Setup after LFG | Operator needs |
+|---|---|
+| Projects share **one** self-hosted backend (it is multi-project: leaves carry the slug, one registry serves all of them) | One CLI, one node, many workloads (`lfgnode workload add <project>` per project) on one machine |
+| Each project runs **its own** backend (for example Valley and FlipIt separately) | **One machine or VM per backend**, each with its own `api-endpoint`, node key and cluster |
+
+If you can choose, run a shared backend: operators then change nothing except the endpoint, and keep a single
+node for all projects. If projects separate, tell multi-project operators early that they need extra machines.
 
 ## Steps for every project
 

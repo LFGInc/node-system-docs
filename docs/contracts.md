@@ -11,15 +11,34 @@ deployments used BSC). Read the repository `SECURITY.md` files, summarized in [S
 Both need `forge`/`cast` ([Foundry](https://book.getfoundry.sh/)) and git submodules
 (`git clone --recurse-submodules`). Both repositories document every environment variable in `.env.example`.
 
+!!! warning "Downloaded without submodules? Pin the dependencies"
+    A ZIP or tarball has an empty `lib/`, and an unpinned `forge install` fetches the **latest** OpenZeppelin
+    (v5.7.0 at the time of writing). That breaks the reward repository: 22 of 23 `HelixToken` tests revert with
+    `ERC1967ProxyUninitialized`. Always give the tag (inside a git repository, for example after `git init`):
+
+    ```bash
+    # node operators reward / HelixToken: 60 tests pass with these
+    forge install foundry-rs/forge-std@v1.9.7 OpenZeppelin/openzeppelin-contracts@v5.1.0 \
+      OpenZeppelin/openzeppelin-contracts-upgradeable@v5.1.0 paulrberg/prb-math@v4.1.0
+    # uptime registry: the versions recorded in its foundry.lock (25 tests pass)
+    forge install foundry-rs/forge-std@v1.14.0 OpenZeppelin/openzeppelin-contracts@v5.5.0
+    ```
+
+    A git clone with `--recurse-submodules` already has the pinned versions, and both repositories carry a
+    `foundry.lock` with them. `forge install` does **not** read the lock: it overwrites it with whatever it
+    fetched, so pass the tags explicitly.
+
 ## Uptime registry
 
 `GlobalNodeUptimeMerkleRegistry` stores one Merkle root per hour (24 per day) and one per day. It uses
 OpenZeppelin `AccessControl`, `Pausable` and `MerkleProof`. It holds no funds; it stores roots and verifies
 proofs.
 
-!!! warning "One registry per project"
-    There is a single root per hour and per day for the whole contract, so two projects sharing one
-    registry would collide on the same slot. Each project deploys its own. The contract is used unchanged.
+!!! warning "One registry per backend"
+    There is a single root per hour and per day for the whole contract, so two **backends** submitting to
+    one registry would collide on the same slot. One backend can serve several projects: each leaf carries
+    the project slug, so one hourly or daily root covers all of them and `verify` works for every project's
+    leaves. Give each separate backend deployment its own registry. The contract is used unchanged.
 
 ### Roles
 
@@ -83,6 +102,23 @@ The tree is an OpenZeppelin Merkle tree with sorted-pair hashing (`@openzeppelin
   the earliest daily submission is shortly after; the backend runs it at 02:02 UTC.
 - Roots are write-once (`IdAlreadyExists`); only the admin can overwrite with `backfillRoot`. A `cid` must
   be 46 to 128 characters.
+
+**Ids to backfill.** Let `D` be the contract day number, `floor((timestamp - 7200) / 86400)`, which is the
+number of days since 1970-01-01 of the UTC calendar date whose slots begin at 02:00 UTC. The daily root that
+`submitDailyRoot` writes now is for `D = currentDayNumber - 1`. For a fresh registry, fill every empty hourly
+id `D*100 + 1` to `D*100 + 24` with `backfillRoot` (ids must not be in the future); the daily id is `D*100`:
+
+```bash
+D=$(( $(date -u -j -f %Y-%m-%d 2026-01-01 +%s) / 86400 ))        # macOS; GNU: $(date -u -d 2026-01-01 +%s)
+for h in $(seq 1 24); do
+  cast send $REGISTRY_ADDRESS "backfillRoot(uint256,bytes32,string)" $((D*100+h)) \
+    0x0000000000000000000000000000000000000000000000000000000000000001 "$CID" \
+    --rpc-url $RPC_URL --private-key $ADMIN_KEY --legacy
+done
+```
+
+`$CID` is any 46 to 128 character string; the placeholder root `0x00...01` is what the backend writes for
+empty hours. `backfillRoot` overwrites, so skip ids that already hold real roots.
 
 ### Contract API
 

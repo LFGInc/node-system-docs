@@ -44,7 +44,8 @@ Repository `opensource-node-cli`:
 7. **`config.yaml` (node private key) and `~/.config/lfgnode/workloads/*.yaml` are world-readable by
    default** (the workload files are mode 0644).
 8. **Replayable request signatures.** EIP-191 over the raw body only, no nonce or timestamp. `DELETE`
-   requests are sent unsigned with body `<nodeAddress>|<projectCode>`.
+   requests now carry a signature over `<nodeAddress>|<projectCode>` (earlier CLI builds sent them unsigned,
+   the backend answered `401`, and the license slot was never freed).
 9. Sentry (only if configured) receives error logs and the node address. go-ethereum is LGPL-3.0 (see
    `NOTICE`).
 
@@ -100,6 +101,13 @@ on-chain by the submitter key.
 Also: single instance only, no automated tests, `smtp.port` ignored. Details and mitigations:
 `SECURITY.md` in the repository.
 
+Operational known issues (found by an independent self-host test, not fixed):
+
+- A workload session left open by a backend outage is never closed (`endTime` stays `NULL`) and is excluded
+  from summaries.
+- `POST /nodes` validation errors are a bare `Bad Request Exception`; registry reverts are not decoded in the
+  backend log, and the log does not print the submission's transaction hash.
+
 ## Contracts
 
 **`GlobalNodeUptimeMerkleRegistry`** (`opensource-merkle_tree_uptime`):
@@ -111,7 +119,7 @@ Also: single instance only, no automated tests, `smtp.port` ignored. Details and
 - `DEFAULT_ADMIN_ROLE` can `backfillRoot` (overwrite) **any** non-future id, including published ones, and
   pause. The overwrite is visible through `RootBackfilled`. Use a multisig and consider a timelock.
   Anything that pays out from a root must treat admin and submitter as trusted.
-- One global root per slot: **one registry per project**. First write wins; a missed hour blocks the daily
+- One global root per slot: **one registry per backend** (a backend may serve several projects). First write wins; a missed hour blocks the daily
   root until backfilled; the 2-hour offset is hard-coded; the daily id refers to the previous day; the leaf
   has no domain separation (no chain id, registry address or id); the CID is only length-checked.
 
@@ -230,7 +238,7 @@ In rough priority order for a self-hoster:
 6. **Monitor chain submissions.** The backend swallows failures: watch Slack or logs, keep the submitter
    funded, and alert on gaps in registry roots; remember `MissingHourlyRoots` blocks the daily root.
 7. **Run singletons as singletons:** one backend instance, one nodesale-reward instance per database, one
-   registry per project. Back up PostgreSQL, especially the reward database.
+   registry per backend. Back up PostgreSQL, especially the reward database.
 8. **Harden operator machines:** bind the Kubernetes API to `127.0.0.1`, `chmod 600` the CLI config
    directory, mount the node key from a Secret file and use an in-cluster ServiceAccount instead of the
    kubeconfig, run images as non-root, restrict pod specs.

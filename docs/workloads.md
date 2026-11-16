@@ -92,8 +92,9 @@ overwrites it (and `version`) from the `PROJECT_CODE` / `VERSION` build args, so
 code registered in your backend. **Pass both build args**: with only `PROJECT_CODE` the rewrite is silently
 skipped. Build one image per project code.
 
-The Dockerfile installs pnpm with `npm install -g pnpm`; pnpm 11 fails with `ERR_PNPM_IGNORED_BUILDS` on
-`@nestjs/core`, so pin `pnpm@9`.
+The `dockerfile` **pins** pnpm (`npm install -g pnpm@9`): an unpinned install gets pnpm 11, which fails with
+`ERR_PNPM_IGNORED_BUILDS` on `@nestjs/core`. The build also downloads `node-prune` from `gobinaries.com`, so
+the build machine needs outbound internet access to that host.
 
 ### Master API contract used by the sample job
 
@@ -141,6 +142,11 @@ package **publicly pullable**, since the manifest references `<image>:<version>`
 `dockerfile` sets `NODE_ENV=stage` for the build stage only; the runtime `NODE_ENV` comes from the
 manifest (`production`). `fluxion-labs/versioning-action` is a third-party action pinned to a commit;
 review it before bumping. Operators install the workload with `lfgnode workload add <project code>`.
+
+**Every release needs a new version.** Publishing a version the backend already has is rejected with
+`409` "Data already exists" (the step fails): bump the version (a new tag) instead of re-running the job. A
+new version reaches running nodes within the workload manager's 10-minute sync
+([Workload manager](workload-manager.md#behaviour)), provided the backend has the fix described there.
 
 ## Deployer (GitHub Action)
 
@@ -191,7 +197,8 @@ The template is parsed as YAML and must have `metadata`, `spec` and `spec.templa
 | if `enable_datagram`: new first container | `datagram`, `image: <datagram_image>`, `envFrom` secret `lfg-workload-<code>`, env `NODE_ADDRESS` from ConfigMap `lfg-node-config` key `nodeAddress`, env `WORKLOAD_NAME=<code>` |
 
 Everything else passes through. The action does **not** substitute `${VAR}`; the template must already be
-final (run `envsubst` in an earlier step, as the template does). The result is serialized with `js-yaml`
+final: the template's workflow does **not** run `envsubst` either, so edit the placeholders (for example
+`MASTER_URL`) in `manifest-template.yaml` itself. The result is serialized with `js-yaml`
 (`sortKeys: true`). Rules that follow from the system as a whole:
 
 - The Deployment name is the project code. The workload manager matches Deployments to backend workloads by

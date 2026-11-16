@@ -127,11 +127,33 @@ pnpm goldsky:login --token "$GOLDSKY_API_KEY" && pnpm goldsky:deploy myproject-n
 ```
 
 Local graph-node alternative (the graph-node image is `linux/amd64` only: on Apple Silicon it runs under
-emulation, slow but working; a local graph-node served both subgraphs fine, no Goldsky needed): `cp .env.example .env` (set `POSTGRES_PASSWORD`, `RPC_URL`,
+emulation, slow but working; no Goldsky needed): `cp .env.example .env` (set `POSTGRES_PASSWORD`, `RPC_URL`,
 `GRAPH_NODE_NETWORK` equal to your config's `network`), `docker compose up -d`, then
 `pnpm prepare:subgraph && pnpm codegen && pnpm build && pnpm create-local && pnpm deploy-local`; GraphQL is at
 `http://localhost:8000/subgraphs/name/node-reward`. The Graph Studio works with `graph auth` and
 `pnpm exec graph deploy <studio-slug> subgraph.yaml`.
+
+#### Local graph-node: ports, image tag, networks
+
+- The compose file publishes Postgres on host port **5434** (not 5432, which clashes with a local Postgres and
+  with the backend's compose file) and pins the graph-node image to `graphprotocol/graph-node:v0.45.0`
+  instead of an untagged `latest`.
+- **One graph-node indexes one network** in this setup (`GRAPH_NODE_NETWORK` + `RPC_URL`). It hosts both
+  subgraphs only when both contracts are on that chain. To test a testnet and an anvil fork at once, run **two
+  graph-nodes** with different ports and data directories. The compose file reads the overrides
+  `COMPOSE_PROJECT_NAME`, `DATA_DIR`, `POSTGRES_HOST_PORT`, `IPFS_HOST_PORT` and `GRAPH_NODE_{GQL,WS,ADMIN,INDEX,METRICS}_PORT`:
+
+  ```bash
+  COMPOSE_PROJECT_NAME=anvil DATA_DIR=data-anvil POSTGRES_HOST_PORT=5435 IPFS_HOST_PORT=5002 \
+  GRAPH_NODE_GQL_PORT=9000 GRAPH_NODE_WS_PORT=9001 GRAPH_NODE_ADMIN_PORT=9020 \
+  GRAPH_NODE_INDEX_PORT=9030 GRAPH_NODE_METRICS_PORT=9040 \
+  GRAPH_NODE_NETWORK=<network> RPC_URL=http://host.docker.internal:8545 docker compose up -d
+  GRAPH_NODE_URL=http://localhost:9020 IPFS_URL=http://localhost:5002 pnpm create-local && pnpm deploy-local
+  ```
+
+  The second instance serves GraphQL at `http://localhost:9000/subgraphs/name/<SUBGRAPH_NAME>`.
+- The **license subgraph has no compose file**. Use the reward subgraph's compose file and point the license
+  subgraph's `GRAPH_NODE_URL` and `IPFS_URL` at it (defaults `http://localhost:8020` and `http://localhost:5001`).
 
 ### Verify and connect
 

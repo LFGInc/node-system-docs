@@ -62,18 +62,28 @@ Resolution order, first match wins:
 | `config.yaml` key | Environment variable | Default | Meaning |
 |---|---|---|---|
 | `api-endpoint` | `LFGNODE_API_ENDPOINT` | none (optionally compiled in) | Backend base URL, no trailing slash. The CLI appends `/api/v1/...`. Also passed to the manager as `NODE_SYSTEM_ENDPOINT` and stored in the ConfigMap as `nodeServerBaseUrl` |
-| `release-endpoint` | `LFGNODE_RELEASE_ENDPOINT` | none | Release host base URL. Read: `<release-endpoint>/releases/stable.txt` or `unstable.txt` and `<release-endpoint>/releases/<version>/lfgnode_<OS>_<arch>.tar.gz` (self-update), `<release-endpoint>/workload-manager/stable.txt` (manager image tag). Passed to the manager as `RELEASE_URL=<release-endpoint>/workload-manager` |
-| `workload-manager-image` | `LFGNODE_WORKLOAD_MANAGER_IMAGE` | none | Manager image repository **without tag**, for example `public.ecr.aws/my-alias/node-system/workload-manager`. Must be anonymously pullable |
+| `release-endpoint` | `LFGNODE_RELEASE_ENDPOINT` | none; **may be empty** (see below) | Release host base URL. Read: `<release-endpoint>/releases/stable.txt` or `unstable.txt` and `<release-endpoint>/releases/<version>/lfgnode_<OS>_<arch>.tar.gz` (self-update), `<release-endpoint>/workload-manager/stable.txt` (manager image tag). Passed to the manager as `RELEASE_URL=<release-endpoint>/workload-manager` |
+| `workload-manager-image` | `LFGNODE_WORKLOAD_MANAGER_IMAGE` | none | Manager image. With a `release-endpoint`: the repository **without tag**, for example `public.ecr.aws/my-alias/node-system/workload-manager` (the tag comes from `stable.txt`). Without one: the full image **with an explicit tag**, for example `ghcr.io/my-org/workload-manager:v1.0.0`. Must be anonymously pullable |
 | `ipfs-gateway` | `LFGNODE_IPFS_GATEWAY` | `https://ipfs.io` | Gateway for manifests, fetched as `<gateway>/ipfs/<cid>/`. Passed to the manager as `IPFS_GATEWAY` |
 | `sentry-dsn` | `LFGNODE_SENTRY_DSN` | empty (disabled) | Optional Sentry DSN. Error logs, 10% sample, node address as user id. Passed to the manager as `SENTRY_DSN` when set |
 | `cluster.name` | | `lfg-node` | Written by the CLI. **Do not change** |
 | `cluster.port` | | `6445` | Host port of the Kubernetes API (written by the CLI) |
 | `node.private-key` | | none | 64 hex characters. Set with `lfgnode config private-key generate` or `set <key>`. Only changeable while no cluster exists (`lfgnode down` first) |
 
+**Empty `release-endpoint`.** It is optional. When it is empty, the manager image is used exactly as given in
+`workload-manager-image` (so put an explicit tag there), no `RELEASE_URL` is passed to the manager and
+**self-update is disabled** for both the manager and `lfgnode update`. Earlier CLI builds exited with
+`release endpoint is not configured` in this case; the current branch does not. Use this for local tests and
+for networks that pin their versions.
+
 A complete annotated example is [`config.example.yaml`](https://github.com/LFG-Incorporated/opensource-node-cli/blob/main/config.example.yaml).
 The CLI rewrites the file on each start and keeps unknown keys. Other files
-in the config directory: `cluster.yaml` (k3d definition, created on first start, editable before the
-cluster exists) and `workloads/*.yaml` (copies of workload secrets).
+in the config directory: `cluster.yaml` (k3d definition, [see below](#clusteryaml)) and `workloads/*.yaml` (copies of workload
+secrets).
+
+!!! warning "`config.yaml` holds the node private key and is written world-readable (0644)"
+    Run `chmod 600` on it (Linux: `~/.config/lfgnode/config.yaml`, macOS: `~/Library/Application Support/lfgnode/config.yaml`)
+    right after the first start, and keep the directory private on shared machines.
 
 Environment variables the CLI sets on the workload manager Deployment:
 
@@ -189,7 +199,12 @@ signature of the raw body made with the node key (no nonce or timestamp).
 | `GET /nodes/<addr>/workloads?onlyVersion=true` | `down` | workloads assigned to the node (`404` code `1012` if the node is unknown to the backend) |
 | `POST /nodes/<addr>/workloads` | `workload add` | check license, returns `{ipfsCid, rewardAddress, ...}` |
 | `GET /nodes/<addr>/workloads/<project>` | `workload status` | per-workload uptime |
-| `DELETE /nodes/<addr>/workloads/<project>` body `<addr>|<project>` (not signed by the CLI) | `workload remove`, `down` | free the license slot |
+| `DELETE /nodes/<addr>/workloads/<project>` body `<addr>|<project>`, **signed** (`X-Signature`, EIP-191 over `<addr>|<project>`) | `workload remove`, `down` | free the license slot |
+
+!!! note "Signed delete"
+    Earlier CLI builds sent this `DELETE` without a signature. The backend answered `401` and the CLI ignored
+    it, so `workload remove` and `down` left the license slot occupied on the backend. The current CLI
+    signs the message `<nodeAddress>|<projectCode>` with the node key, and the slot is freed.
 
 The workload manager additionally calls `PATCH /nodes/<addr>/uptime`,
 `GET /nodes/<addr>/workloads?onlyVersion=true` and `PATCH /nodes/<addr>/workloads/<project>`.
@@ -199,13 +214,49 @@ The workload manager additionally calls `PATCH /nodes/<addr>/uptime`,
 | Topic | Detail |
 |---|---|
 | **Do not use `-v/--verbose`** | It crashes with `flag provided but not defined: -v` (stdlib flag parse in `pkg/kubectl`) **after** the cluster is created but **before** the manager and ipfs are deployed, leaving a half-initialised cluster. Recovery: `lfgnode down` (or `k3d cluster delete lfg-node`) and start again without the flag |
-| **One cluster per machine** | The cluster name `lfg-node` is global in Docker. An old, stopped cluster with that name must be removed before a new `lfgnode start` |
+| **One node per machine** | The cluster name `lfg-node`, the Kubernetes API port `6445` and the config directory are fixed, so a machine runs exactly one node. An old, stopped cluster with that name must be removed before a new `lfgnode start`. See [multiple projects](#one-node-many-projects) |
 | **Separate test config** | Run with a separate `HOME` (for example `HOME=$PWD/testhome lfgnode ...`) to keep a test config apart from a real one. The config directory is `~/Library/Application Support/lfgnode` on macOS and `~/.config/lfgnode` on Linux |
 | **Private / HTTP image registry** | `cluster.yaml` (editable before the first start) accepts a k3d `registries.config` mirror, see below |
 | **http endpoints** | The CLI accepts `http://` for `api-endpoint`, `release-endpoint` and `ipfs-gateway`; only the workload manager is https-only ([Workload manager](workload-manager.md#local-development)) |
-| **Self-update** | With an `http://` release URL self-update breaks: leave `release-endpoint` (and so the manager's `RELEASE_URL`) empty in tests |
+| **Self-update** | With an `http://` release URL self-update breaks. Leave `release-endpoint` empty in tests (supported: the manager image is then taken from `workload-manager-image`, which needs an explicit tag). If you do serve a release endpoint over http, dev builds read `workload-manager/unstable.txt` and the manager still cannot self-update |
+| **Self-signed TLS** | The Go CLI rejects self-signed `https://` and has no insecure flag: give it `http://<ip>.sslip.io:<httpPort>` and patch the manager Deployment afterwards ([recipe](local-testing.md#self-signed-tls-for-the-manager)) |
 
-Example mirror for a plain-HTTP registry on the host (port `5001` is a placeholder), in `cluster.yaml`:
+### cluster.yaml
+
+`cluster.yaml` is the k3d definition. The CLI **writes it only if the file does not exist**, on the first
+`lfgnode start`, and reads it at every start; changes take effect only when the cluster is (re)created. To add
+`registries:` (or anything else) **before the first start**, pre-create the file in the config directory with
+the default content below:
+
+```yaml
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: lfg-node
+servers: 1
+agents: 0
+kubeAPI:
+  hostIP: "0.0.0.0"
+  hostPort: "6445"
+image: rancher/k3s:v1.31.0-k3s1
+options:
+  k3d:
+    wait: true
+    timeout: "60s"
+    disableLoadbalancer: false
+    disableImageVolume: false
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true
+  runtime:
+    ulimits:
+      - name: nofile
+        soft: 1024
+        hard: 1024
+```
+
+Keep `name: lfg-node` and the port ([fixed names](fixed-names.md)). To use a plain-HTTP registry on the host
+(port `5001` is a placeholder), append a `registries:` block to the same file:
 
 ```yaml
 registries:
@@ -216,7 +267,18 @@ registries:
           - http://host.k3d.internal:5001
 ```
 
-Then use `host.k3d.internal:5001/...` image names. The full local path is in [Local testing](local-testing.md).
+The block goes at the top level of the file, next to `options:`. Then use `host.k3d.internal:5001/...` image
+names. The full local path is in [Local testing](local-testing.md).
+
+## One node, many projects
+
+`lfgnode` is one node per machine, and a node belongs to **one backend**. The backend itself is multi-project:
+one CLI, one node and many workloads (`lfgnode workload add <project>` for each) can serve every project that
+this backend knows, and one licensed wallet can earn in all of them.
+
+An operator who earns in projects that run on **different** self-hosted backends (for example Valley and
+FlipIt after leaving LFG, each with its own backend) needs **one machine or VM per backend**, unless the
+projects share one backend. See [Migration from LFG](migration-from-lfg.md#one-node-per-backend).
 
 ## When the backend is down
 
